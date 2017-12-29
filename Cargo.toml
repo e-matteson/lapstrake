@@ -7,5 +7,7 @@ authors = ["e-matteson <e.r.matteson@gmail.com>"]
 
 svg = "*"
 csv = "*"
-scad-dots = {git = "https://github.com/e-matteson/scad-dots.git"}
-# scad-dots = { path = "../scad-dots" }
+failure = "*"
+# scad-dots = {git = "https://github.com/e-matteson/scad-dots.git"}
+scad-dots = { path = "../scad-dots" }
+scad-dots-derive = { path = "../scad-dots/scad-dots-derive"}
