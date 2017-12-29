@@ -5,4 +5,5 @@ authors = ["e-matteson <e.r.matteson@gmail.com>"]
 
 [dependencies]
 
-svg =  "*"
+svg = "*"
+csv = "*"
