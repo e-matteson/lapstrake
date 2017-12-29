@@ -1,5 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
+use failure::{Error, ResultExt};
 
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -10,28 +11,45 @@ pub struct Feet {
 }
 
 impl Feet {
-    pub fn parse(text: &str) -> Feet {
+    pub fn parse(text: &str) -> Result<Feet, Error> {
+        match Feet::parse_opt(text)? {
+            None => bail!(concat!(
+                "Was unable to read measurement '{}'. ",
+                "(This measurement cannot be ommited.)"),
+                          text),
+            Some(feet) => Ok(feet)
+        }
+    }
 
-        fn parse_usize(text: &str) -> u32 {
+    pub fn parse_opt(text: &str) -> Result<Option<Feet>, Error> {
+
+        fn parse_usize(text: &str) -> Result<u32, Error> {
             match u32::from_str(text) {
-                Ok(n) => n,
-                Err(_) => panic!(concat!(
-                    "Was not able to read number in measurement: {}. ",
-                    "Expected formatting like 3-4-5 for 3' 4 5/8\"."),
-                                 text)
+                Ok(n) => Ok(n),
+                Err(_) => bail!(
+                    "Was not able to read number in measurement '{}'.",
+                    text)
             }
         }
 
+        if text == "x" {
+            return Ok(None);
+        }
+
         let parts: Vec<&str> = text.split('-').collect();
+        let ctx = concat!(
+            "Was not able to read measurement. ",
+            "Expected formatting like 3-4-5 for 3' 4 5/8\".");
+            
         match parts.as_slice() {
             &[feet, inches, eighths] =>
-                Feet{
-                    feet:    parse_usize(&feet),
-                    inches:  parse_usize(&inches),
-                    eighths: parse_usize(&eighths)
-                },
-            _ => panic!(concat!(
-                "Was not able to read measurement: {}. ",
+                Ok(Some(Feet{
+                    feet:    parse_usize(&feet).context(ctx)?,
+                    inches:  parse_usize(&inches).context(ctx)?,
+                    eighths: parse_usize(&eighths).context(ctx)?
+                })),
+            _ => bail!(concat!(
+                "Was not able to read measurement '{}'. ",
                 "Expected formatting like 3-4-5 for 3' 4 5/8\". ",
                 "All parts of the measurement must be included, ",
                 "even if they are zero."),
@@ -73,28 +91,11 @@ impl fmt::Display for Feet {
             (0, inches, 0) =>
                 write!(f, "{}\"", inches),
             (0, inches, eighths) =>
-                write!(f, "{} {}\"", inches, Eighths(eighths)),
+                write!(f, "{} {}/8\"", inches, eighths),
             (feet, inches, 0) =>
                 write!(f, "{}' {}\"", feet, inches),
-            (feet, inches, eighths) => {
-                write!(f, "{}' {} {}\"", feet, inches, Eighths(eighths))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Eighths(u32);
-
-impl fmt::Display for Eighths {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let Eighths(eighths) = *self;
-        match eighths {
-            1 | 3 | 5 | 7 => write!(f, "{}/8", eighths),
-            2 | 6         => write!(f, "{}/4", eighths / 2),
-            4             => write!(f, "1/2"),
-            0             => write!(f, "0/8"), // shouldn't be called
-            _ => panic!("Bad number of eighths! {}/8", eighths)
+            (feet, inches, eighths) =>
+                write!(f, "{}' {} {}/8\"", feet, inches, eighths)
         }
     }
 }
