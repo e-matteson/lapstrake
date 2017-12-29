@@ -7,3 +7,5 @@ authors = ["e-matteson <e.r.matteson@gmail.com>"]
 
 svg = "*"
 csv = "*"
+scad-dots = {git = "https://github.com/e-matteson/scad-dots.git"}
+# scad-dots = { path = "../scad-dots" }
