@@ -10,7 +10,7 @@ pub struct Feet {
 }
 
 impl Feet {
-    fn parse(text: &str) -> Feet {
+    pub fn parse(text: &str) -> Feet {
 
         fn parse_usize(text: &str) -> u32 {
             match u32::from_str(text) {
