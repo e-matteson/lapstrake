@@ -16,8 +16,7 @@ pub struct Spec {
 /// Configuration options.
 #[derive(Debug)]
 pub struct Config {
-    pub sheer_thickness: usize,
-    pub wale_thickness: usize
+    pub stuff: u8
 }
 
 /// A standard set of reference points for the hull shape.
@@ -43,24 +42,59 @@ pub struct Data {
 /// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
 pub type DataRow<T> = (T, Vec<Option<usize>>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BreadthLine {
     Sheer,
     Wale,
-    Rabbet,
     ButOut(usize)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum HeightLine {
     Sheer,
     WLUp(usize)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum DiagonalLine {
     A,
     B
+}
+
+impl Spec {
+    pub fn get_sheer_breadth(&self, station_index: usize)
+                             -> Result<usize, Error>
+    {
+        for &(ref breadth, ref row) in &self.data.heights {
+            match *breadth {
+                BreadthLine::Sheer => {
+                    match row[station_index] {
+                        Some(x) => return Ok(x),
+                        None => bail!("Sheer is required, but was omitted.")
+                    }
+                },
+                _     => ()
+            }
+        }
+        bail!("Did not find sheer breadth.")
+    }
+
+    pub fn get_sheer_height(&self, station_index: usize)
+                            -> Result<usize, Error>
+    {
+        for &(ref height, ref row) in &self.data.breadths {
+            match *height {
+                HeightLine::Sheer => {
+                    match row[station_index] {
+                        Some(x) => return Ok(x),
+                        None => bail!("Sheer is required, but was omitted.")
+                    }
+                }
+                _     => ()
+            }
+        }
+        bail!("Did not find sheer height.")
+    }
 }
 
 impl FromStr for BreadthLine {
@@ -69,7 +103,6 @@ impl FromStr for BreadthLine {
         match text.to_lowercase().as_str() {
             "sheer"  => Ok(BreadthLine::Sheer),
             "wale"   => Ok(BreadthLine::Wale),
-            "rabbet" => Ok(BreadthLine::Rabbet),
             text     => {
                 let feet = Feet::parse(text)
                     .context("Was unable to read height.")?;
