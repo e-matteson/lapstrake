@@ -32,7 +32,7 @@ fn read_data_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Data, Error>
     where T: io::Read
 {
     // Read stations
-    println!("Parsing stations...");
+    println!("Parsing stations.");
     let mut stations = vec!();
     {
         let headers = csv.headers();
@@ -46,7 +46,7 @@ fn read_data_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Data, Error>
     let mut recs = csv.records().peekable();
 
     // Read Positions
-    println!("Parsing positions...");
+    println!("Parsing positions.");
     let mut positions = vec!();
     let csv_positions = recs.next();
     let csv_positions = csv_positions.expect("Could not read positions.")?;
@@ -63,7 +63,7 @@ fn read_data_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Data, Error>
         match read_section_name(&mut recs)? {
             None => break,
             Some(section) => {
-                println!("Parsing section {:?}...", section);
+                println!("Parsing section {:?}.", section);
                 match section {
                     Section::Height =>
                         read_section(&mut recs, &mut heights),

@@ -50,7 +50,6 @@ pub enum Diagonal {
 impl FromStr for Height {
     type Err = Error;
     fn from_str(text: &str) -> Result<Height, Error> {
-        println!("Parsing height {:?} {:?}", text, text.to_lowercase());
         match text.to_lowercase().as_str() {
             "sheer"  => Ok(Height::Sheer),
             "wale"   => Ok(Height::Wale),
