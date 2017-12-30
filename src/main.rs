@@ -10,18 +10,18 @@ extern crate csv;
 #[macro_use]
 extern crate failure;
 
-mod unit;
-mod spec;
-mod load;
+pub mod unit;
+pub mod spec;
+pub mod load;
+pub mod catmullrom;
+//mod spline;
 mod render_3d;
 mod render_2d;
 
-use render_2d::{SvgColor, SvgPath};
-use scad_dots::utils::P2;
-
 use std::path::Path;
 use load::read_data;
-use load::print_error;
+use failure::Error;
+
 
 fn main() {
     match read_data(Path::new("data.csv")) {
@@ -30,5 +30,15 @@ fn main() {
             println!("ok");
         }
         Err(err) => print_error(err)
+    }
+}
+
+fn print_error(error: Error) {
+    let mut causes = error.causes();
+    if let Some(first) = causes.next() {
+        println!("\nError: {}", first);
+    }
+    for cause in causes {
+        println!("Cause: {}", cause);
     }
 }

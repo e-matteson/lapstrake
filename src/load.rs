@@ -1,3 +1,5 @@
+//! Read in ship data from csv files.
+
 use std::path::Path;
 use std::str::FromStr;
 use std::iter;
@@ -10,16 +12,8 @@ use unit::*;
 use spec::*;
 
 
-pub fn print_error(error: Error) {
-    let mut causes = error.causes();
-    if let Some(first) = causes.next() {
-        println!("\nError: {}", first);
-    }
-    for cause in causes {
-        println!("Cause: {}", cause);
-    }
-}
-
+/// Read the data file, which contains reference points along cross
+/// sections of the hull.
 pub fn read_data(path: &Path) -> Result<Data, Error> {
     let reader = csv::Reader::from_path(path)
         .context(format!("Could not read file {:?}.", path))?;
@@ -65,11 +59,11 @@ fn read_data_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Data, Error>
             Some(section) => {
                 println!("Parsing section {:?}.", section);
                 match section {
-                    Section::Height =>
+                    Section::Heights =>
                         read_section(&mut recs, &mut heights),
-                    Section::Breadth =>
+                    Section::Breadths =>
                         read_section(&mut recs, &mut breadths),
-                    Section::Diagonal =>
+                    Section::Diagonals =>
                         read_section(&mut recs, &mut diagonals)
                 }
             }.context(format!("Could not parse section {:?}.", section))?
@@ -132,9 +126,9 @@ fn read_section_name<CSV>(csv: &mut CSV) -> Result<Option<Section>, Error>
             match row.next() {
                 Some(name) => {
                     match name.to_lowercase().as_str() {
-                        "height"   => Ok(Some(Section::Height)),
-                        "breadth"  => Ok(Some(Section::Breadth)),
-                        "diagonal" => Ok(Some(Section::Diagonal)),
+                        "height"   => Ok(Some(Section::Heights)),
+                        "breadth"  => Ok(Some(Section::Breadths)),
+                        "diagonal" => Ok(Some(Section::Diagonals)),
                         _          => bail!(concat!(
                             "Did not recognize the name {}. ",
                             "Expected one of these section names: ",
@@ -150,7 +144,7 @@ fn read_section_name<CSV>(csv: &mut CSV) -> Result<Option<Section>, Error>
 
 #[derive(Debug)]
 enum Section {
-    Height,
-    Breadth,
-    Diagonal
+    Heights,
+    Breadths,
+    Diagonals
 }

@@ -1,8 +1,11 @@
+//! Units. Right now only feet are supported.
+
 use std::fmt;
 use std::str::FromStr;
 use failure::{Error, ResultExt};
 
 
+/// Feet, inches, and eighths of an inch.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Feet {
     pub feet: u32,
@@ -11,6 +14,7 @@ pub struct Feet {
 }
 
 impl Feet {
+    /// Parse Feet from a string, using the format 2-3-4.
     pub fn parse(text: &str) -> Result<Feet, Error> {
         match Feet::parse_opt(text)? {
             None => bail!(concat!(
@@ -21,6 +25,8 @@ impl Feet {
         }
     }
 
+    /// Parse Option<Feet> from a string, using the format 2-3-4, or
+    /// "x" for None.
     pub fn parse_opt(text: &str) -> Result<Option<Feet>, Error> {
 
         fn parse_usize(text: &str) -> Result<u32, Error> {
