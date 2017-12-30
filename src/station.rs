@@ -18,7 +18,7 @@ pub struct Station {
 impl Station {
     pub fn render_3d(&self) -> Result<(), Error> {
         let path = ScadPath::new(self.points.clone())
-            .stroke(100.0)
+            .stroke(5.0)
             .link(PathStyle::Dots)?;
         preview_model(&path)
     }
@@ -40,10 +40,8 @@ impl Spec {
                     BreadthLine::Sheer => (),
                     BreadthLine::Wale => (),
                     BreadthLine::ButOut(breadth) => {
-                        for &height in row {
-                            if let Some(height) = height {
-                                points.push(point(position, breadth, height));
-                            }
+                        if let Some(height) = row[i] {
+                            points.push(point(position, breadth, height));
                         }
                     }
                 }
@@ -52,10 +50,8 @@ impl Spec {
                 match *height {
                     HeightLine::Sheer => (),
                     HeightLine::WLUp(height) => {
-                        for &breadth in row {
-                            if let Some(breadth) = breadth {
+                        if let Some(breadth) = row[i] {
                                 points.push(point(position, breadth, height));
-                            }
                         }
                     }
                 }
