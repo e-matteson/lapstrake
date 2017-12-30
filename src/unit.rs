@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(x_feet, x);
 
         // Parsing
-        assert_eq!(Feet::parse("2-3-4"), x);
+        assert_eq!(Feet::parse("2-3-4").unwrap(), x);
 
         // Debug printing
         assert_eq!(&format!("{:?}", x), "2-3-4");
@@ -136,10 +136,10 @@ mod tests {
         assert_eq!(&format!("{}", Feet{ feet: 0, inches: 30, eighths: 0 }),
                    "30\"");
         assert_eq!(&format!("{}", Feet{ feet: 0, inches: 3, eighths: 4 }),
-                   "3 1/2\"");
+                   "3 4/8\"");
         assert_eq!(&format!("{}", Feet{ feet: 2, inches: 0, eighths: 5 }),
                    "2' 0 5/8\"");
         assert_eq!(&format!("{}", Feet{ feet: 0, inches: 0, eighths: 6 }),
-                   "0 3/4\"");
+                   "0 6/8\"");
     }
 }
