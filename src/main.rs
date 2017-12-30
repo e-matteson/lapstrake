@@ -17,7 +17,9 @@ mod render_3d;
 mod render_2d;
 
 use render_2d::{SvgColor, SvgPath};
-use scad_dots::utils::P2;
+use render_3d::{PathStyle, ScadPath};
+use scad_dots::utils::{P2, P3};
+use scad_dots::harness::preview_model;
 
 use std::path::Path;
 use load::read_data;

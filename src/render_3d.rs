@@ -1,14 +1,123 @@
 use std::f32::consts::PI;
 
-use scad_dots::core::{mark, Dot, DotSpec, Shape, Tree};
-use scad_dots::utils::{axis_radians, Corner3 as C3, P3, V3};
+use failure::Error;
+
+use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
+use scad_dots::utils::{axis_radians, Corner3 as C3, P3, R3, V3};
 use scad_dots::harness::{check_model, Action};
 // use scad_dots::parse::scad_relative_eq;
 
 
+/// Example:
+///
+/// ```
+/// let path = ScadPath::new(vec![
+///     P3::new(0., 0., 0.),
+///     P3::new(50., 50., 0.),
+///     P3::new(100., 20., 75.),
+/// ]).show_dots();
+///
+/// preview_model(&path.link(PathStyle::Line)?)?;
+/// ```
+
+
+pub struct ScadPath {
+    points: Vec<P3>,
+    show_dots: bool,
+    stroke: f32,
+}
+
+pub enum PathStyle {
+    Dots,
+    Line,
+    Solid,
+}
+
+impl ScadPath {
+    pub fn new(points: Vec<P3>) -> ScadPath {
+        ScadPath {
+            points: points,
+            show_dots: false,
+            stroke: 1.,
+        }
+    }
+
+    pub fn show_dots(mut self) -> ScadPath {
+        self.show_dots = true;
+        self
+    }
+
+    pub fn stroke(mut self, width: f32) -> Self {
+        self.stroke = width;
+        self
+    }
+
+    pub fn link(self, style: PathStyle) -> Result<Tree, Error> {
+        let dots = self.make_dots(self.stroke);
+        let mut tree = match style {
+            PathStyle::Dots => Tree::Union(dots),
+            PathStyle::Solid => Tree::Hull(dots),
+            PathStyle::Line => chain(&dots)?,
+        };
+        if self.show_dots {
+            let markers = Tree::Union(self.make_dots(self.stroke * 2.));
+            tree = union![tree, markers];
+        }
+        Ok(tree)
+    }
+
+    // pub fn save(self, path: &str) -> Result<(), Error> {
+    //     let mut doc = SvgDoc::new(self.bound());
+    //     doc.append(self.finalize());
+    //     doc.save(path)?;
+    //     Ok(())
+    // }
+
+    fn make_dots(&self, diameter: f32) -> Vec<Tree> {
+        let mut dots = Vec::new();
+        for p in &self.points {
+            let spec = DotSpec {
+                pos: p.to_owned(),
+                align: DotAlign::center_solid(),
+                size: diameter,
+                rot: R3::identity(),
+            };
+            dots.push(dot![Dot::new(Shape::Sphere, spec)]);
+        }
+        dots
+    }
+}
+
+
+
+#[test]
+fn test_path_surface() {
+    check_model("test_path_surface", Action::Preview, || {
+        let path = ScadPath::new(vec![
+            P3::new(0., 0., 20.),
+            P3::new(0., 10., 0.),
+            P3::new(0., 5., -10.),
+        ]).show_dots();
+        path.link(PathStyle::Solid)
+    })
+}
+
+
+#[test]
+fn test_path_line_dots() {
+    check_model("test_path_line_dots", Action::Preview, || {
+        let path = ScadPath::new(vec![
+            P3::new(0., 0., 0.),
+            P3::new(50., 50., 0.),
+            P3::new(100., 20., 75.),
+        ]).show_dots();
+        path.link(PathStyle::Line)
+    })
+}
+
 #[test]
 fn test_dot_sphere() {
-    check_model("test_dot_sphere", Action::Run, || {
+    check_model("test_dot_sphere", Action::Test, || {
         let n = Dot::new(
             Shape::Sphere,
             DotSpec {
@@ -24,7 +133,7 @@ fn test_dot_sphere() {
 
 #[test]
 fn test_surface() {
-    check_model("test_surface", Action::Run, || {
+    check_model("test_surface", Action::Test, || {
         Ok(hull![
             mark(P3::origin(), 1.),
             mark(P3::new(10., 0., 0.,), 1.),

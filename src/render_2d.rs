@@ -23,12 +23,6 @@ pub struct SvgDoc {
     doc: Document,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Bound {
-    low: P2,
-    high: P2,
-}
-
 pub struct SvgPath {
     points: Vec<P2>,
     show_dots: bool,
@@ -41,6 +35,13 @@ pub struct SvgCircle {
     radius: f64,
     fill: SvgColor,
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct Bound {
+    low: P2,
+    high: P2,
+}
+
 
 #[derive(Clone, Copy, Debug)]
 struct Stroke {
@@ -61,18 +62,6 @@ pub enum SvgColor {
     White,
     LightGrey,
     DarkGrey,
-}
-
-impl Bound {
-    fn view_box(&self) -> (f32, f32, f32, f32) {
-        (self.low.x, self.low.y, self.width(), self.height())
-    }
-    fn width(&self) -> f32 {
-        self.high.x - self.low.x
-    }
-    fn height(&self) -> f32 {
-        self.high.y - self.low.y
-    }
 }
 
 impl SvgDoc {
@@ -192,6 +181,18 @@ impl SvgCircle {
 
         element.assign("fill", self.fill);
         element
+    }
+}
+
+impl Bound {
+    fn view_box(&self) -> (f32, f32, f32, f32) {
+        (self.low.x, self.low.y, self.width(), self.height())
+    }
+    fn width(&self) -> f32 {
+        self.high.x - self.low.x
+    }
+    fn height(&self) -> f32 {
+        self.high.y - self.low.y
     }
 }
 
