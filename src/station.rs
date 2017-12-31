@@ -11,12 +11,19 @@ use svg::node::element::Group;
 
 use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
 
+/// A ship's hull.
+pub struct Hull {
+    pub stations: Vec<Station>,
+}
+
 /// A cross-section of the hull.
 pub struct Station {
     pub position: f32,
     pub points: Vec<P3>,
     pub spline: Spline,
 }
+
+impl Hull {}
 
 impl Station {
     pub fn render_3d(&self) -> Result<Tree, Error> {
@@ -26,16 +33,21 @@ impl Station {
             .link(PathStyle3::Line);
         path
     }
-
-    pub fn render_2d(&self) -> SvgPath {
-        SvgPath::new(project(Axis::X, &self.points))
+    pub fn render_spline_2d(&self) -> SvgPath {
+        SvgPath::new(project(Axis::X, &self.spline.sample()))
             .stroke(SvgColor::Black, 2.0)
             .style(PathStyle2::LineWithDots)
+    }
+
+    pub fn render_points_2d(&self) -> SvgPath {
+        SvgPath::new(project(Axis::X, &self.points))
+            .stroke(SvgColor::Blue, 2.0)
+            .style(PathStyle2::Dots)
     }
 }
 
 impl Spec {
-    pub fn get_stations(&self, resolution: usize) -> Result<Vec<Station>, Error> {
+    pub fn get_hull(&self, resolution: usize) -> Result<Hull, Error> {
         let data = &self.data;
         let mut stations = vec![];
         for (i, &position) in data.positions.iter().enumerate() {
@@ -73,7 +85,7 @@ impl Spec {
             };
             stations.push(station);
         }
-        Ok(stations)
+        Ok(Hull { stations: stations })
     }
 }
 

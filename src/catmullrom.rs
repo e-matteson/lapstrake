@@ -39,10 +39,14 @@ impl CentripetalCatmullRom {
         let t_2 = knot(&points, 2, t_1);
         let t_3 = knot(&points, 3, t_2);
         let knots = [t_0, t_1, t_2, t_3];
-        CentripetalCatmullRom {
+        let c = CentripetalCatmullRom {
             points: points,
             knots:  knots
+        };
+        for i in 0..4 {
+            println!("{} {}", points[i], c.compute(knots[i]));
         }
+        c
     }
 
     /// Sample `resolution` points along the chosen segment of the spline.

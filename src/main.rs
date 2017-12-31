@@ -36,20 +36,26 @@ use render_2d::SvgDoc;
 fn main() {
     match read_data(Path::new("data.csv")) {
         Ok(data) => {
-            let resolution = 10;
+            let resolution = 2;
             let spec = Spec {
                 config: Config { stuff: 0 },
                 data: data,
             };
-            let stations = spec.get_stations(resolution).unwrap();
+            let hull = spec.get_hull(resolution).unwrap();
+            //            hull.stations[3].render_3d();
             // let mut trees = Vec::new();
-            let mut doc = SvgDoc::new();
+            // let mut doc = SvgDoc::new();
 
-            for station in &stations {
-                doc.append_path(station.render_2d());
-                //     trees.push(station.render_3d().unwrap());
-            }
-            doc.save("out.svg");
+            // for station in &stations {
+            //     doc.append_path(station.render_2d());
+            //     //     trees.push(station.render_3d().unwrap());
+            // }
+            // doc.save("out.svg");
+            // hull.stations[15].render_spline_2d("spline.svg");
+            // hull.stations[15].render_points_2d("points.svg");
+            // // for station in &stations {
+            // //     trees.push(station.render_3d().unwrap());
+            // // }
             // preview_model(&Tree::Union(trees)).unwrap();
 
             println!("ok");
