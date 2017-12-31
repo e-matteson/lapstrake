@@ -14,7 +14,7 @@ pub struct CentripetalCatmullRom {
 
 /// Which segment of the spline to look at.
 /// Whenever possible, use the middle segment.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Segment {
     First,
     Middle,
@@ -69,10 +69,11 @@ impl CentripetalCatmullRom {
 
     fn at_segment(&self, f: f32, segment: Segment) -> P3 {
         let i = segment.index();
-        self.compute(self.knots[i] + f * (self.knots[i + 1] - self.knots[i]))
+        let t = self.knots[i] + f * (self.knots[i + 1] - self.knots[i]);
+        self.compute(t, segment != Segment::Middle)
     }
 
-    fn compute(&self, t: f32) -> P3 {
+    fn compute(&self, t: f32, at_end: bool) -> P3 {
         // Compute intermediates
         let a_1 = self.intermediate(0, 1, self.points[0], self.points[1], t);
         let a_2 = self.intermediate(1, 2, self.points[1], self.points[2], t);
@@ -81,12 +82,15 @@ impl CentripetalCatmullRom {
         let b_2 = self.intermediate(1, 3, a_2, a_3, t);
         // Compute answer
 
-        // Every resource on the internet says to use this formula,
-        // but it seems broken, and does not cover the reference points:
-//        self.intermediate(1, 2, b_1, b_2, t)
-
-        // But this seems more natural and gives the reference points:
-        self.intermediate(0, 3, b_1, b_2, t)
+        if at_end {
+            // We're not at the middle segment.
+            // Catmull-rom splines do not handle this case.
+            // We're not really sure how to handle this case well.
+            // Let's just fall back to the Lagrange curve.
+            self.intermediate(0, 3, b_1, b_2, t)
+        } else {
+            self.intermediate(1, 2, b_1, b_2, t)
+        }
     }
 
     fn intermediate(&self, i: usize, j: usize, p: P3, q: P3, t: f32) -> P3 {

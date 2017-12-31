@@ -36,10 +36,11 @@ impl Station {
             .link(PathStyle3::Line);
         path
     }
+
     pub fn render_spline_2d(&self) -> SvgPath {
         SvgPath::new(project(Axis::X, &self.spline.sample()))
             .stroke(SvgColor::Black, 2.0)
-            .style(PathStyle2::LineWithDots)
+            .style(PathStyle2::Line)
     }
 
     pub fn render_points_2d(&self) -> SvgPath {

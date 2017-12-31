@@ -33,15 +33,16 @@ use spec::Config;
 use render_2d::SvgDoc;
 
 
+const RESOLUTION: usize = 20;
+
 fn main() {
     match read_data(Path::new("data.csv")) {
         Ok(data) => {
-            let resolution = 2;
             let spec = Spec {
                 config: Config { stuff: 0 },
                 data: data,
             };
-            let hull = spec.get_hull(resolution).unwrap();
+            let hull = spec.get_hull(RESOLUTION).unwrap();
             //            hull.stations[3].render_3d();
             let mut doc = SvgDoc::new();
 
