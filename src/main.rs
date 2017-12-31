@@ -36,8 +36,8 @@ fn main() {
                 config: Config{ stuff: 0 },
                 data: data
             };
-            let stations = spec.get_stations(resolution).unwrap();
-            stations[3].render_3d();
+            let hull = spec.get_hull(resolution).unwrap();
+            hull.stations[3].render_3d();
             println!("ok");
         }
         Err(err) => print_error(err)

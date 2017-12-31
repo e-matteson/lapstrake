@@ -8,6 +8,11 @@ use scad_dots::harness::preview_model;
 use render_3d::{ScadPath, PathStyle};
 
 
+/// A ship's hull.
+pub struct Hull {
+    pub stations: Vec<Station>
+}
+
 /// A cross-section of the hull.
 pub struct Station {
     pub position: f32,
@@ -25,7 +30,7 @@ impl Station {
 }
 
 impl Spec {
-    pub fn get_stations(&self, resolution: usize) -> Result<Vec<Station>, Error> {
+    pub fn get_hull(&self, resolution: usize) -> Result<Hull, Error> {
         let data = &self.data;
         let mut stations = vec!();
         for (i, &position) in data.positions.iter().enumerate() {
@@ -67,7 +72,9 @@ impl Spec {
             };
             stations.push(station);
         }
-        Ok(stations)
+        Ok(Hull{
+            stations: stations
+        })
     }
 }
 
