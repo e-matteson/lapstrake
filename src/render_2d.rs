@@ -13,7 +13,7 @@ use svg::node::element::path::Data;
 ///
 /// ```
 /// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
-///     .show_dots()
+///     .show_points()
 ///     .stroke(SvgColor::Blue, 2.);
 /// path.save("tests/tmp/bluepath.svg").unwrap();
 /// ```
@@ -25,7 +25,7 @@ pub struct SvgDoc {
 
 pub struct SvgPath {
     points: Vec<P2>,
-    show_dots: bool,
+    show_points: bool,
     stroke: Stroke,
 }
 
@@ -86,7 +86,7 @@ impl SvgPath {
     pub fn new(points: Vec<P2>) -> SvgPath {
         SvgPath {
             points: points,
-            show_dots: false,
+            show_points: false,
             stroke: Stroke {
                 color: SvgColor::Black,
                 width: 1.,
@@ -94,10 +94,11 @@ impl SvgPath {
         }
     }
 
-    pub fn show_dots(mut self) -> SvgPath {
-        self.show_dots = true;
+    pub fn show_points(mut self) -> SvgPath {
+        self.show_points = true;
         self
     }
+
     pub fn stroke(mut self, color: SvgColor, width: f64) -> Self {
         self.stroke = Stroke {
             color: color,
@@ -114,7 +115,7 @@ impl SvgPath {
         path.assign("fill", "none");
 
         let mut group = Group::new().add(path);
-        if self.show_dots {
+        if self.show_points {
             group.append(self.dots())
         }
         group
@@ -128,7 +129,7 @@ impl SvgPath {
     }
 
     fn dots(&self) -> Group {
-        let radius = 1.5 * self.stroke.width;
+        let radius = self.stroke.width;
         let color = self.stroke.color;
 
         let mut group = Group::new();
@@ -185,6 +186,12 @@ impl SvgCircle {
 }
 
 impl Bound {
+    fn from_origin(&self, width: f32, height: f32) -> Bound {
+        Bound {
+            low: P2::origin(),
+            high: P2::new(width, height),
+        }
+    }
     fn view_box(&self) -> (f32, f32, f32, f32) {
         (self.low.x, self.low.y, self.width(), self.height())
     }
@@ -193,6 +200,12 @@ impl Bound {
     }
     fn height(&self) -> f32 {
         self.high.y - self.low.y
+    }
+    fn combine(&self, other: Bound) -> Bound {
+        Bound {
+            low: P2::new(self.low.x.min(other.low.x), self.low.y.min(other.low.y)),
+            high: P2::new(self.high.x.max(other.high.x), self.high.y.max(other.high.y)),
+        }
     }
 }
 

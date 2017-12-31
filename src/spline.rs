@@ -30,17 +30,24 @@ impl Spline {
                          ref_points[i + 2],
                          ref_points[i + 3]];
             let catmull = CentripetalCatmullRom::new(array);
-            if i == 0 {
+            points.extend(catmull.sample(Middle, resolution));
+/*            if i == 0 {
                 points.extend(catmull.sample(First, resolution));
             }
             points.extend(catmull.sample(Middle, resolution));
             if i == n - 4 {
                 points.extend(catmull.sample(Last, resolution));
-            }
+            }*/
         }
         Ok(Spline {
             points: points
         })
+    }
+
+    /// A sample of points along the spline, at the resolution given
+    /// at construction.
+    pub fn sample(&self) -> Vec<P3> {
+        self.points.clone()
     }
 
     /// The total length of the spline.
