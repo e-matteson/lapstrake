@@ -15,7 +15,7 @@ use scad_dots::harness::{check_model, Action};
 ///     P3::new(0., 0., 0.),
 ///     P3::new(50., 50., 0.),
 ///     P3::new(100., 20., 75.),
-/// ]).show_dots();
+/// ]).show_points();
 ///
 /// preview_model(&path.link(PathStyle::Line)?)?;
 /// ```
@@ -23,7 +23,7 @@ use scad_dots::harness::{check_model, Action};
 
 pub struct ScadPath {
     points: Vec<P3>,
-    show_dots: bool,
+    show_points: bool,
     stroke: f32,
 }
 
@@ -37,13 +37,13 @@ impl ScadPath {
     pub fn new(points: Vec<P3>) -> ScadPath {
         ScadPath {
             points: points,
-            show_dots: false,
+            show_points: false,
             stroke: 1.,
         }
     }
 
-    pub fn show_dots(mut self) -> ScadPath {
-        self.show_dots = true;
+    pub fn show_points(mut self) -> ScadPath {
+        self.show_points = true;
         self
     }
 
@@ -59,19 +59,13 @@ impl ScadPath {
             PathStyle::Solid => Tree::Hull(dots),
             PathStyle::Line => chain(&dots)?,
         };
-        if self.show_dots {
+        if self.show_points {
             let markers = Tree::Union(self.make_dots(self.stroke * 2.));
             tree = union![tree, markers];
         }
         Ok(tree)
     }
 
-    // pub fn save(self, path: &str) -> Result<(), Error> {
-    //     let mut doc = SvgDoc::new(self.bound());
-    //     doc.append(self.finalize());
-    //     doc.save(path)?;
-    //     Ok(())
-    // }
 
     fn make_dots(&self, diameter: f32) -> Vec<Tree> {
         let mut dots = Vec::new();
@@ -97,7 +91,7 @@ fn test_path_surface() {
             P3::new(0., 0., 20.),
             P3::new(0., 10., 0.),
             P3::new(0., 5., -10.),
-        ]).show_dots();
+        ]).show_points();
         path.link(PathStyle::Solid)
     })
 }
@@ -110,7 +104,7 @@ fn test_path_line_dots() {
             P3::new(0., 0., 0.),
             P3::new(50., 50., 0.),
             P3::new(100., 20., 75.),
-        ]).show_dots();
+        ]).show_points();
         path.link(PathStyle::Line)
     })
 }
