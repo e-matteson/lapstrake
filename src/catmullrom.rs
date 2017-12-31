@@ -53,11 +53,16 @@ impl CentripetalCatmullRom {
     }
 
     /// Sample `resolution` points along the chosen segment of the spline.
-    pub fn sample(&self, segment: Segment, resolution: usize) -> Vec<P3> {
+    pub fn sample(&self, segment: Segment, resolution: usize, at_end: bool)
+                  -> Vec<P3>
+    {
         let mut samples = vec!();
         for k in 0..resolution {
             let t = k as f32 / resolution as f32;
             samples.push(self.at_segment(t, segment))
+        }
+        if at_end {
+            samples.push(self.at_segment(1.0, segment));
         }
         samples
     }

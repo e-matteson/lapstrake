@@ -31,11 +31,11 @@ impl Spline {
                          ref_points[i + 3]];
             let catmull = CentripetalCatmullRom::new(array);
             if i == 0 {
-                points.extend(catmull.sample(First, resolution));
+                points.extend(catmull.sample(First, resolution, false));
             }
-            points.extend(catmull.sample(Middle, resolution));
+            points.extend(catmull.sample(Middle, resolution, false));
             if i == n - 4 {
-                points.extend(catmull.sample(Last, resolution));
+                points.extend(catmull.sample(Last, resolution, true));
             }
         }
         /*

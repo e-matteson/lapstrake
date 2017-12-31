@@ -46,8 +46,8 @@ fn main() {
             let mut doc = SvgDoc::new();
 
             for station in &hull.stations {
-                doc.append_path(station.render_points_2d());
                 doc.append_path(station.render_spline_2d());
+                doc.append_path(station.render_points_2d());
             }
             doc.save("out.svg");
             // let mut trees = Vec::new();
