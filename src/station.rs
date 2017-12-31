@@ -6,8 +6,8 @@ use spec::{BreadthLine, DiagonalLine, HeightLine, Spec};
 use spline::Spline;
 use scad_dots::harness::preview_model;
 use scad_dots::utils::distance;
-use render_3d::{PathStyle, ScadPath};
-use render_2d::{SvgColor, SvgPath};
+use render_3d::{PathStyle3, ScadPath};
+use render_2d::{PathStyle2, SvgColor, SvgPath};
 use svg::node::element::Group;
 
 use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
@@ -18,7 +18,7 @@ const EQUALITY_THRESHOLD: f32 = 8.0;
 
 /// A ship's hull.
 pub struct Hull {
-    pub stations: Vec<Station>
+    pub stations: Vec<Station>,
 }
 
 /// A cross-section of the hull.
@@ -33,24 +33,19 @@ impl Station {
         let path = ScadPath::new(self.points.clone())
             .stroke(10.0)
             .show_points()
-            .link(PathStyle::Line);
+            .link(PathStyle3::Line);
         path
     }
-
-    pub fn render_spline_2d(&self, out: &str) {
-        let points = &self.spline.sample();
-        let path = SvgPath::new(project(Axis::X, points))
+    pub fn render_spline_2d(&self) -> SvgPath {
+        SvgPath::new(project(Axis::X, &self.spline.sample()))
             .stroke(SvgColor::Black, 2.0)
-            .show_points()
-            .save(out);
+            .style(PathStyle2::LineWithDots)
     }
 
-    pub fn render_points_2d(&self, out: &str) {
-        let points = &self.points;
-        let path = SvgPath::new(project(Axis::X, points))
-            .stroke(SvgColor::Black, 2.0)
-            .show_points()
-            .save(out);
+    pub fn render_points_2d(&self) -> SvgPath {
+        SvgPath::new(project(Axis::X, &self.points))
+            .stroke(SvgColor::Green, 1.5)
+            .style(PathStyle2::Dots)
     }
 }
 
@@ -94,9 +89,7 @@ impl Spec {
             };
             stations.push(station);
         }
-        Ok(Hull{
-            stations: stations
-        })
+        Ok(Hull { stations: stations })
     }
 }
 
