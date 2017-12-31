@@ -17,7 +17,7 @@ use scad_dots::harness::{check_model, Action};
 ///     P3::new(100., 20., 75.),
 /// ]).show_points();
 ///
-/// preview_model(&path.link(PathStyle::Line)?)?;
+/// preview_model(&path.link(PathStyle3::Line)?)?;
 /// ```
 
 
@@ -27,7 +27,7 @@ pub struct ScadPath {
     stroke: f32,
 }
 
-pub enum PathStyle {
+pub enum PathStyle3 {
     Dots,
     Line,
     Solid,
@@ -52,12 +52,12 @@ impl ScadPath {
         self
     }
 
-    pub fn link(self, style: PathStyle) -> Result<Tree, Error> {
+    pub fn link(self, style: PathStyle3) -> Result<Tree, Error> {
         let dots = self.make_dots(self.stroke);
         let mut tree = match style {
-            PathStyle::Dots => Tree::Union(dots),
-            PathStyle::Solid => Tree::Hull(dots),
-            PathStyle::Line => chain(&dots)?,
+            PathStyle3::Dots => Tree::Union(dots),
+            PathStyle3::Solid => Tree::Hull(dots),
+            PathStyle3::Line => chain(&dots)?,
         };
         if self.show_points {
             let markers = Tree::Union(self.make_dots(self.stroke * 2.));
@@ -92,7 +92,7 @@ fn test_path_surface() {
             P3::new(0., 10., 0.),
             P3::new(0., 5., -10.),
         ]).show_points();
-        path.link(PathStyle::Solid)
+        path.link(PathStyle3::Solid)
     })
 }
 
@@ -105,7 +105,7 @@ fn test_path_line_dots() {
             P3::new(50., 50., 0.),
             P3::new(100., 20., 75.),
         ]).show_points();
-        path.link(PathStyle::Line)
+        path.link(PathStyle3::Line)
     })
 }
 

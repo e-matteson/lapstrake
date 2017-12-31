@@ -30,6 +30,7 @@ use scad_dots::harness::{check_model, preview_model, Action};
 // TODO: temp
 use spec::Spec;
 use spec::Config;
+use render_2d::SvgDoc;
 
 
 fn main() {
@@ -42,10 +43,13 @@ fn main() {
             };
             let stations = spec.get_stations(resolution).unwrap();
             // let mut trees = Vec::new();
-            stations[3].render_2d();
-            // for station in &stations {
-            //     trees.push(station.render_3d().unwrap());
-            // }
+            let mut doc = SvgDoc::new();
+
+            for station in &stations {
+                doc.append_path(station.render_2d());
+                //     trees.push(station.render_3d().unwrap());
+            }
+            doc.save("out.svg");
             // preview_model(&Tree::Union(trees)).unwrap();
 
             println!("ok");

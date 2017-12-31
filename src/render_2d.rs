@@ -5,7 +5,7 @@ use failure::Error;
 
 use svg::{self, Document, Node};
 use svg::node::Value;
-use svg::node::element::{Circle, Group, Path};
+use svg::node::element::{Circle, Group, Path, Rectangle};
 use svg::node::element::path::Data;
 
 
@@ -13,27 +13,44 @@ use svg::node::element::path::Data;
 ///
 /// ```
 /// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
-///     .show_points()
+///     .style(PathStyle2::LineWithDots)
 ///     .stroke(SvgColor::Blue, 2.);
 /// path.save("tests/tmp/bluepath.svg").unwrap();
 /// ```
 ///
 
+pub enum PathStyle2 {
+    Dots,
+    Line,
+    LineWithDots,
+}
+
 pub struct SvgDoc {
-    doc: Document,
+    contents: Group,
+    bound: Bound,
 }
 
 pub struct SvgPath {
     points: Vec<P2>,
     show_points: bool,
     stroke: Stroke,
+    style: PathStyle2,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct SvgCircle {
     pos: P2,
-    radius: f64,
+    radius: f32,
     fill: SvgColor,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SvgRect {
+    pos: P2,
+    size: V2,
+    stroke: Option<Stroke>,
+    fill: Option<SvgColor>,
+    fillet: Option<V2>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -46,7 +63,7 @@ pub struct Bound {
 #[derive(Clone, Copy, Debug)]
 struct Stroke {
     color: SvgColor,
-    width: f64,
+    width: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -65,20 +82,41 @@ pub enum SvgColor {
 }
 
 impl SvgDoc {
-    pub fn new(view: Bound) -> SvgDoc {
-        let mut doc = Document::new().set("viewBox", view.view_box());
-        SvgDoc { doc: doc }
+    pub fn new() -> SvgDoc {
+        SvgDoc {
+            contents: Group::new(),
+            bound: Bound::new(),
+        }
     }
 
-    pub fn append<T>(&mut self, node: T)
+    pub fn append_node<T>(&mut self, node: T)
     where
         T: Node,
     {
-        self.doc.append(node)
+        self.contents.append(node)
     }
 
-    pub fn save(&self, path: &str) -> Result<(), Error> {
-        Ok(svg::save(path, &self.doc)?)
+    pub fn append_path(&mut self, path: SvgPath) {
+        self.bound = self.bound.combine(path.bound());
+        self.contents.append(path.finalize())
+    }
+
+    pub fn set_bound(&mut self, bound: Bound) {
+        // If you've only used append_path, you won't need to set the bound explicitly
+        self.bound = bound;
+    }
+
+    pub fn finalize(self) -> Document {
+        let background = SvgRect::new(self.bound.low, self.bound.size()).fill(SvgColor::White);
+        let doc = Document::new()
+            .set("viewBox", self.bound.view_box())
+            .add(background.finalize())
+            .add(self.contents);
+        doc
+    }
+
+    pub fn save(self, filename: &str) -> Result<(), Error> {
+        Ok(svg::save(filename, &self.finalize())?)
     }
 }
 
@@ -91,15 +129,11 @@ impl SvgPath {
                 color: SvgColor::Black,
                 width: 1.,
             },
+            style: PathStyle2::Line,
         }
     }
 
-    pub fn show_points(mut self) -> SvgPath {
-        self.show_points = true;
-        self
-    }
-
-    pub fn stroke(mut self, color: SvgColor, width: f64) -> Self {
+    pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
         self.stroke = Stroke {
             color: color,
             width: width,
@@ -107,24 +141,32 @@ impl SvgPath {
         self
     }
 
-    pub fn finalize(self) -> Group {
-        let mut path = Path::new();
-        path.assign("d", self.path_data());
-        path.assign("stroke", self.stroke.color);
-        path.assign("stroke-width", self.stroke.width);
-        path.assign("fill", "none");
+    pub fn style(mut self, style: PathStyle2) -> Self {
+        self.style = style;
+        self
+    }
 
-        let mut group = Group::new().add(path);
-        if self.show_points {
+    pub fn finalize(self) -> Group {
+        let mut group = Group::new();
+        if self.style.has_line() {
+            let mut path = Path::new();
+            path.assign("d", self.path_data());
+            path.assign("stroke", self.stroke.color);
+            path.assign("stroke-width", self.stroke.width);
+            path.assign("fill", "none");
+            group.append(path);
+        }
+
+        if self.style.has_dots() {
             group.append(self.dots())
         }
         group
     }
 
-    pub fn save(self, path: &str) -> Result<(), Error> {
-        let mut doc = SvgDoc::new(self.bound());
-        doc.append(self.finalize());
-        doc.save(path)?;
+    pub fn save(self, filename: &str) -> Result<(), Error> {
+        let mut doc = SvgDoc::new();
+        doc.append_path(self);
+        doc.save(filename)?;
         Ok(())
     }
 
@@ -165,8 +207,25 @@ impl SvgPath {
     }
 }
 
+impl PathStyle2 {
+    fn has_line(&self) -> bool {
+        match *self {
+            PathStyle2::Dots => false,
+            PathStyle2::Line => true,
+            PathStyle2::LineWithDots => true,
+        }
+    }
+    fn has_dots(&self) -> bool {
+        match *self {
+            PathStyle2::Dots => true,
+            PathStyle2::Line => false,
+            PathStyle2::LineWithDots => true,
+        }
+    }
+}
+
 impl SvgCircle {
-    pub fn new(pos: P2, radius: f64, color: SvgColor) -> Self {
+    pub fn new(pos: P2, radius: f32, color: SvgColor) -> Self {
         Self {
             pos: pos,
             radius: radius,
@@ -185,8 +244,81 @@ impl SvgCircle {
     }
 }
 
+impl SvgRect {
+    pub fn new(pos: P2, size: V2) -> Self {
+        Self {
+            pos: pos,
+            size: size,
+            stroke: None,
+            fill: None,
+            fillet: None,
+        }
+    }
+
+    pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
+        self.stroke = Some(Stroke {
+            color: color,
+            width: width,
+        });
+        self
+    }
+
+    pub fn fill(mut self, fill: SvgColor) -> Self {
+        self.fill = Some(fill);
+        self
+    }
+
+    pub fn fillet(mut self, radius: f32) -> Self {
+        assert!(radius >= 0.);
+        self.fillet = Some(V2::new(radius, radius));
+        self
+    }
+
+    pub fn center(&self) -> P2 {
+        self.pos + self.size / 2.
+    }
+
+    pub fn scale(mut self, factor: f32) -> Self {
+        // Scale the switch uniformly around its center
+        let center = self.center();
+        self.size *= factor;
+        self.pos = center - self.size / 2.;
+        self
+    }
+
+    pub fn finalize(self) -> Rectangle {
+        let mut element = Rectangle::new()
+            .set("x", self.pos.x)
+            .set("y", self.pos.y)
+            .set("width", self.size.x)
+            .set("height", self.size.y);
+
+        if let Some(stroke) = self.stroke {
+            element.assign("stroke", stroke.color);
+            element.assign("stroke-width", stroke.width);
+        }
+
+        if let Some(color) = self.fill {
+            element.assign("fill", color);
+        } else {
+            element.assign("fill", "none");
+        }
+
+        if let Some(fillet) = self.fillet {
+            element.assign("rx", fillet.x);
+            element.assign("ry", fillet.y);
+        }
+        element
+    }
+}
+
+
 impl Bound {
-    fn from_origin(&self, width: f32, height: f32) -> Bound {
+    fn new() -> Bound {
+        Bound::from_origin(0., 0.)
+    }
+
+    fn from_origin(width: f32, height: f32) -> Bound {
         Bound {
             low: P2::origin(),
             high: P2::new(width, height),
@@ -201,6 +333,10 @@ impl Bound {
     fn height(&self) -> f32 {
         self.high.y - self.low.y
     }
+    fn size(&self) -> V2 {
+        V2::new(self.width(), self.height())
+    }
+
     fn combine(&self, other: Bound) -> Bound {
         Bound {
             low: P2::new(self.low.x.min(other.low.x), self.low.y.min(other.low.y)),

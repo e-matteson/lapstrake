@@ -5,8 +5,8 @@ use failure::Error;
 use spec::{BreadthLine, DiagonalLine, HeightLine, Spec};
 use spline::Spline;
 use scad_dots::harness::preview_model;
-use render_3d::{PathStyle, ScadPath};
-use render_2d::{SvgColor, SvgPath};
+use render_3d::{PathStyle3, ScadPath};
+use render_2d::{PathStyle2, SvgColor, SvgPath};
 use svg::node::element::Group;
 
 use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
@@ -23,16 +23,14 @@ impl Station {
         let path = ScadPath::new(self.points.clone())
             .stroke(10.0)
             .show_points()
-            .link(PathStyle::Line);
+            .link(PathStyle3::Line);
         path
     }
 
-    // pub fn render_2d(&self) -> Result<Group, Error> {
-    pub fn render_2d(&self) {
-        let path = SvgPath::new(project(Axis::X, &self.points))
+    pub fn render_2d(&self) -> SvgPath {
+        SvgPath::new(project(Axis::X, &self.points))
             .stroke(SvgColor::Black, 2.0)
-            .show_points()
-            .save("out.svg");
+            .style(PathStyle2::LineWithDots)
     }
 }
 
