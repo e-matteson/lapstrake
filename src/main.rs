@@ -43,19 +43,15 @@ fn main() {
             };
             let hull = spec.get_hull(resolution).unwrap();
             //            hull.stations[3].render_3d();
-            // let mut trees = Vec::new();
-            // let mut doc = SvgDoc::new();
+            let mut doc = SvgDoc::new();
 
-            // for station in &stations {
-            //     doc.append_path(station.render_2d());
-            //     //     trees.push(station.render_3d().unwrap());
-            // }
-            // doc.save("out.svg");
-            // hull.stations[15].render_spline_2d("spline.svg");
-            // hull.stations[15].render_points_2d("points.svg");
-            // // for station in &stations {
-            // //     trees.push(station.render_3d().unwrap());
-            // // }
+            for station in &hull.stations {
+                doc.append_path(station.render_points_2d());
+                doc.append_path(station.render_spline_2d());
+            }
+            doc.save("out.svg");
+            // let mut trees = Vec::new();
+            //     trees.push(station.render_3d().unwrap());
             // preview_model(&Tree::Union(trees)).unwrap();
 
             println!("ok");
