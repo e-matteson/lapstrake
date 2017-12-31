@@ -5,11 +5,16 @@ use failure::Error;
 use spec::{BreadthLine, DiagonalLine, HeightLine, Spec};
 use spline::Spline;
 use scad_dots::harness::preview_model;
+use scad_dots::utils::distance;
 use render_3d::{PathStyle, ScadPath};
 use render_2d::{SvgColor, SvgPath};
 use svg::node::element::Group;
 
 use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
+
+
+// How near points must be to be considered equal, in 1/8th of an inch.
+const EQUALITY_THRESHOLD: f32 = 8.0;
 
 /// A ship's hull.
 pub struct Hull {
@@ -21,10 +26,6 @@ pub struct Station {
     pub position: f32,
     pub points: Vec<P3>,
     pub spline: Spline,
-}
-
-impl Hull {
-    
 }
 
 impl Station {
@@ -82,8 +83,9 @@ impl Spec {
                 }
             }
             // TODO: diagonals
-            // The points came in out of order: sort them.
-            points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+            // The points are out of order, and may contain duplicates.
+            // Sort them and remove the duplicates.
+            let points = sort_and_remove_duplicates(points);
             // Construct the station (cross section).
             let station = Station {
                 position: position as f32,
@@ -96,6 +98,20 @@ impl Spec {
             stations: stations
         })
     }
+}
+
+fn sort_and_remove_duplicates(mut points: Vec<P3>) -> Vec<P3> {
+    points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+    let mut good_points = vec!();
+    good_points.push(points[0]);
+    let mut prev_point = points[0];
+    for &point in &points[1..] {
+        if distance(&point, &prev_point) >= EQUALITY_THRESHOLD {
+            good_points.push(point);
+        }
+        prev_point = point;
+    }
+    good_points
 }
 
 fn point(x: usize, y: usize, z: usize) -> P3 {

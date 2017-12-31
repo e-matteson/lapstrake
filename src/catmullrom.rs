@@ -43,9 +43,12 @@ impl CentripetalCatmullRom {
             points: points,
             knots:  knots
         };
+        /*
+        println!("");
         for i in 0..4 {
             println!("{} {}", points[i], c.compute(knots[i]));
         }
+        */
         c
     }
 
@@ -72,7 +75,13 @@ impl CentripetalCatmullRom {
         let b_1 = self.intermediate(0, 2, a_1, a_2, t);
         let b_2 = self.intermediate(1, 3, a_2, a_3, t);
         // Compute answer
-        self.intermediate(1, 2, b_1, b_2, t)
+
+        // Every resource on the internet says to use this formula,
+        // but it seems broken, and does not cover the reference points:
+//        self.intermediate(1, 2, b_1, b_2, t)
+
+        // But this seems more natural and gives the reference points:
+        self.intermediate(0, 3, b_1, b_2, t)
     }
 
     fn intermediate(&self, i: usize, j: usize, p: P3, q: P3, t: f32) -> P3 {
