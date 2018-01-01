@@ -4,3 +4,4 @@
 Cargo.lock
 /tests/tmp
 /tests/bad_models
+*.svg
