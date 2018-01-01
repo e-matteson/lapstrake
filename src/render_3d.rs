@@ -27,6 +27,7 @@ pub struct ScadPath {
     stroke: f32,
 }
 
+#[allow(dead_code)]
 pub enum PathStyle3 {
     Dots,
     Line,

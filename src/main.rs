@@ -23,9 +23,7 @@ use std::path::Path;
 use load::read_data;
 use failure::Error;
 
-use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
-use scad_dots::utils::{axis_radians, Corner3 as C3, P3, R3, V3};
-use scad_dots::harness::{check_model, preview_model, Action};
+// use scad_dots::harness::{preview_model};
 
 // TODO: temp
 use spec::Spec;
@@ -36,23 +34,16 @@ use render_2d::SvgDoc;
 fn main() {
     match read_data(Path::new("data.csv")) {
         Ok(data) => {
-            let resolution = 2;
+            let resolution = 10;
             let spec = Spec {
                 config: Config { stuff: 0 },
                 data: data,
             };
             let hull = spec.get_hull(resolution).unwrap();
-            //            hull.stations[3].render_3d();
             let mut doc = SvgDoc::new();
 
-            for station in &hull.stations {
-                doc.append_path(station.render_spline_2d());
-                doc.append_path(station.render_points_2d());
-            }
-            doc.save("out.svg");
-            // let mut trees = Vec::new();
-            //     trees.push(station.render_3d().unwrap());
-            // preview_model(&Tree::Union(trees)).unwrap();
+            doc.append_paths(hull.draw_half_breadths());
+            doc.save("out.svg").unwrap();
 
             println!("ok");
         }

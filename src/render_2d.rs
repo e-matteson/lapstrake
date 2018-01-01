@@ -19,6 +19,7 @@ use svg::node::element::path::Data;
 /// ```
 ///
 
+#[derive(Clone, Copy, Debug)]
 pub enum PathStyle2 {
     Dots,
     Line,
@@ -32,7 +33,6 @@ pub struct SvgDoc {
 
 pub struct SvgPath {
     points: Vec<P2>,
-    show_points: bool,
     stroke: Stroke,
     style: PathStyle2,
 }
@@ -89,22 +89,28 @@ impl SvgDoc {
         }
     }
 
-    pub fn append_node<T>(&mut self, node: T)
-    where
-        T: Node,
-    {
-        self.contents.append(node)
-    }
+    // pub fn append_node<T>(&mut self, node: T)
+    // where
+    //     T: Node,
+    // {
+    //     self.contents.append(node)
+    // }
 
     pub fn append_path(&mut self, path: SvgPath) {
         self.bound = self.bound.combine(path.bound());
         self.contents.append(path.finalize())
     }
 
-    pub fn set_bound(&mut self, bound: Bound) {
-        // If you've only used append_path, you won't need to set the bound explicitly
-        self.bound = bound;
+    pub fn append_paths(&mut self, paths: Vec<SvgPath>) {
+        for path in paths {
+            self.append_path(path);
+        }
     }
+
+    // pub fn set_bound(&mut self, bound: Bound) {
+    //     // If you've only used append_path, you won't need to set the bound explicitly
+    //     self.bound = bound;
+    // }
 
     pub fn finalize(self) -> Document {
         let background = SvgRect::new(self.bound.low, self.bound.size()).fill(SvgColor::White);
@@ -124,13 +130,16 @@ impl SvgPath {
     pub fn new(points: Vec<P2>) -> SvgPath {
         SvgPath {
             points: points,
-            show_points: false,
             stroke: Stroke {
                 color: SvgColor::Black,
                 width: 1.,
             },
             style: PathStyle2::Line,
         }
+    }
+
+    pub fn new_segment(start: P2, end: P2) -> SvgPath {
+        SvgPath::new(vec![start, end])
     }
 
     pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
@@ -255,36 +264,36 @@ impl SvgRect {
         }
     }
 
-    pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
-        self.stroke = Some(Stroke {
-            color: color,
-            width: width,
-        });
-        self
-    }
+    // pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
+    //     self.stroke = Some(Stroke {
+    //         color: color,
+    //         width: width,
+    //     });
+    //     self
+    // }
 
     pub fn fill(mut self, fill: SvgColor) -> Self {
         self.fill = Some(fill);
         self
     }
 
-    pub fn fillet(mut self, radius: f32) -> Self {
-        assert!(radius >= 0.);
-        self.fillet = Some(V2::new(radius, radius));
-        self
-    }
+    // pub fn fillet(mut self, radius: f32) -> Self {
+    //     assert!(radius >= 0.);
+    //     self.fillet = Some(V2::new(radius, radius));
+    //     self
+    // }
 
-    pub fn center(&self) -> P2 {
-        self.pos + self.size / 2.
-    }
+    // pub fn center(&self) -> P2 {
+    //     self.pos + self.size / 2.
+    // }
 
-    pub fn scale(mut self, factor: f32) -> Self {
-        // Scale the switch uniformly around its center
-        let center = self.center();
-        self.size *= factor;
-        self.pos = center - self.size / 2.;
-        self
-    }
+    // pub fn scale(mut self, factor: f32) -> Self {
+    //     // Scale the switch uniformly around its center
+    //     let center = self.center();
+    //     self.size *= factor;
+    //     self.pos = center - self.size / 2.;
+    //     self
+    // }
 
     pub fn finalize(self) -> Rectangle {
         let mut element = Rectangle::new()
@@ -374,7 +383,8 @@ fn test_svg() {
 impl Into<Value> for SvgColor {
     fn into(self) -> Value {
         match self {
-            SvgColor::Red => "#fa99b7",
+            // SvgColor::Red => "#fa99b7",
+            SvgColor::Red => "red",
             SvgColor::Yellow => "#eba676",
             SvgColor::Green => "#a7be74",
             SvgColor::Cyan => "#48c9b4",
