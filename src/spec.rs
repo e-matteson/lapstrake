@@ -14,7 +14,7 @@ pub struct Spec {
 }
 
 /// Configuration options.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub stuff: u8
 }
@@ -65,9 +65,9 @@ impl Spec {
     pub fn get_sheer_breadth(&self, station_index: usize)
                              -> Result<usize, Error>
     {
-        for &(ref breadth, ref row) in &self.data.heights {
-            match *breadth {
-                BreadthLine::Sheer => {
+        for &(ref height, ref row) in &self.data.breadths {
+            match *height {
+                HeightLine::Sheer => {
                     match row[station_index] {
                         Some(x) => return Ok(x),
                         None => bail!("Sheer is required, but was omitted.")
@@ -82,9 +82,9 @@ impl Spec {
     pub fn get_sheer_height(&self, station_index: usize)
                             -> Result<usize, Error>
     {
-        for &(ref height, ref row) in &self.data.breadths {
-            match *height {
-                HeightLine::Sheer => {
+        for &(ref breadth, ref row) in &self.data.heights {
+            match *breadth {
+                BreadthLine::Sheer => {
                     match row[station_index] {
                         Some(x) => return Ok(x),
                         None => bail!("Sheer is required, but was omitted.")
