@@ -9,7 +9,7 @@ pub struct CentripetalCatmullRom {
     // The four points to interpolate between.
     points: [P3; 4],
     // The time parameters at which each of the four points will be hit.
-    knots:  [f32; 4]
+    knots: [f32; 4],
 }
 
 /// Which segment of the spline to look at.
@@ -18,15 +18,15 @@ pub struct CentripetalCatmullRom {
 pub enum Segment {
     First,
     Middle,
-    Last
+    Last,
 }
 
 impl Segment {
     fn index(&self) -> usize {
         match *self {
-            Segment::First  => 0,
+            Segment::First => 0,
             Segment::Middle => 1,
-            Segment::Last   => 2
+            Segment::Last => 2,
         }
     }
 }
@@ -41,7 +41,7 @@ impl CentripetalCatmullRom {
         let knots = [t_0, t_1, t_2, t_3];
         let c = CentripetalCatmullRom {
             points: points,
-            knots:  knots
+            knots: knots,
         };
         /*
         println!("");
@@ -53,10 +53,13 @@ impl CentripetalCatmullRom {
     }
 
     /// Sample `resolution` points along the chosen segment of the spline.
-    pub fn sample(&self, segment: Segment, resolution: usize, at_end: bool)
-                  -> Vec<P3>
-    {
-        let mut samples = vec!();
+    pub fn sample(
+        &self,
+        segment: Segment,
+        resolution: usize,
+        at_end: bool,
+    ) -> Vec<P3> {
+        let mut samples = vec![];
         for k in 0..resolution {
             let t = k as f32 / resolution as f32;
             samples.push(self.at_segment(t, segment))
@@ -96,7 +99,7 @@ impl CentripetalCatmullRom {
     fn intermediate(&self, i: usize, j: usize, p: P3, q: P3, t: f32) -> P3 {
         let t_i = self.knots[i];
         let t_j = self.knots[j];
-        let left  = (t_j - t) / (t_j - t_i) * p;
+        let left = (t_j - t) / (t_j - t_i) * p;
         let right = (t - t_i) / (t_j - t_i) * q;
         P3::from_coordinates(left.coords + right.coords)
     }
@@ -105,5 +108,5 @@ impl CentripetalCatmullRom {
 
 fn knot(points: &[P3; 4], i: usize, prev_knot: f32) -> f32 {
     // 'centripetal' means alpha = 1/2, so take sqrt.
-    f32::sqrt(distance(&points[i], &points[i-1])) + prev_knot
+    f32::sqrt(distance(&points[i], &points[i - 1])) + prev_knot
 }

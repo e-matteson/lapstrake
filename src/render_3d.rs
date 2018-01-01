@@ -95,7 +95,7 @@ mod tests {
                 P3::new(0., 0., 20.),
                 P3::new(0., 10., 0.),
                 P3::new(0., 5., -10.),
-                ]).show_points();
+            ]).show_points();
             path.link(PathStyle3::Solid)
         })
     }
@@ -107,7 +107,7 @@ mod tests {
                 P3::new(0., 0., 0.),
                 P3::new(50., 50., 0.),
                 P3::new(100., 20., 75.),
-                ]).show_points();
+            ]).show_points();
             path.link(PathStyle3::Line)
         })
     }
@@ -123,7 +123,7 @@ mod tests {
                     size: 2.0,
                     rot: axis_radians(V3::x_axis().unwrap(), PI / 4.),
                 },
-                );
+            );
             Ok(dot![n])
         })
     }
@@ -135,7 +135,7 @@ mod tests {
                 mark(P3::origin(), 1.),
                 mark(P3::new(10., 0., 0.,), 1.),
                 mark(P3::new(10., 10., 0.), 1.)
-                    ])
+            ])
         })
     }
 }

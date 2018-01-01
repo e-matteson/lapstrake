@@ -113,7 +113,8 @@ impl SvgDoc {
     // }
 
     pub fn finalize(self) -> Document {
-        let background = SvgRect::new(self.bound.low, self.bound.size()).fill(SvgColor::White);
+        let background = SvgRect::new(self.bound.low, self.bound.size())
+            .fill(SvgColor::White);
         let doc = Document::new()
             .set("viewBox", self.bound.view_box())
             .add(background.finalize())
@@ -185,7 +186,8 @@ impl SvgPath {
 
         let mut group = Group::new();
         for p in &self.points {
-            group.append(SvgCircle::new(p.to_owned(), radius, color).finalize());
+            group
+                .append(SvgCircle::new(p.to_owned(), radius, color).finalize());
         }
         group
     }
@@ -348,36 +350,42 @@ impl Bound {
 
     fn combine(&self, other: Bound) -> Bound {
         Bound {
-            low: P2::new(self.low.x.min(other.low.x), self.low.y.min(other.low.y)),
-            high: P2::new(self.high.x.max(other.high.x), self.high.y.max(other.high.y)),
+            low: P2::new(
+                self.low.x.min(other.low.x),
+                self.low.y.min(other.low.y),
+            ),
+            high: P2::new(
+                self.high.x.max(other.high.x),
+                self.high.y.max(other.high.y),
+            ),
         }
     }
 }
 
 
-#[test]
-fn test_svg() {
-    let data = Data::new()
-        .move_to((10, 10))
-        .line_by((0, 50))
-        .line_by((50, 0))
-        .line_by((0, -50))
-        .close();
+// #[test]
+// fn test_svg() {
+//     let data = Data::new()
+//         .move_to((10, 10))
+//         .line_by((0, 50))
+//         .line_by((50, 0))
+//         .line_by((0, -50))
+//         .close();
 
-    let path = Path::new()
-        .set("fill", "none")
-        .set("stroke", "black")
-        .set("stroke-width", 3)
-        .set("d", data);
+//     let path = Path::new()
+//         .set("fill", "none")
+//         .set("stroke", "black")
+//         .set("stroke-width", 3)
+//         .set("d", data);
 
-    let document = Document::new().set("viewBox", (0, 0, 70, 70)).add(path);
-    assert_eq!(
-        "<svg viewBox=\"0 0 70 70\" xmlns=\"http://www.w3.org/2000/svg\">
-<path d=\"M10,10 l0,50 l50,0 l0,-50 z\" fill=\"none\" stroke=\"black\" stroke-width=\"3\"/>
-</svg>",
-        document.to_string()
-    );
-}
+//     let document = Document::new().set("viewBox", (0, 0, 70, 70)).add(path);
+//     assert_eq!(
+//         "<svg viewBox=\"0 0 70 70\" xmlns=\"http://www.w3.org/2000/svg\">
+// <path d=\"M10,10 l0,50 l50,0 l0,-50 z\" fill=\"none\" stroke=\"black\" stroke-width=\"3\"/>
+// </svg>",
+//         document.to_string()
+//     );
+// }
 
 
 impl Into<Value> for SvgColor {

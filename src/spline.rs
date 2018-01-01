@@ -7,29 +7,32 @@ use scad_dots::utils::distance;
 use failure::Error;
 
 use catmullrom::CentripetalCatmullRom;
-use catmullrom::Segment::{First, Middle, Last};
+use catmullrom::Segment::{First, Last, Middle};
 
 
 /// A spline with any number of points.
 #[derive(Debug, Clone)]
 pub struct Spline {
-    points: Vec<P3>
+    points: Vec<P3>,
 }
 
 impl Spline {
-    pub fn new(ref_points: Vec<P3>, resolution: usize)
-               -> Result<Spline, Error>
-    {
+    pub fn new(
+        ref_points: Vec<P3>,
+        resolution: usize,
+    ) -> Result<Spline, Error> {
         let n = ref_points.len();
         if n < 4 {
             bail!("Splines must have at least 4 points.")
         }
-        let mut points = vec!();
-        for i in 0..n-3 {
-            let array = [ref_points[i],
-                         ref_points[i + 1],
-                         ref_points[i + 2],
-                         ref_points[i + 3]];
+        let mut points = vec![];
+        for i in 0..n - 3 {
+            let array = [
+                ref_points[i],
+                ref_points[i + 1],
+                ref_points[i + 2],
+                ref_points[i + 3],
+            ];
             let catmull = CentripetalCatmullRom::new(array);
             if i == 0 {
                 points.extend(catmull.sample(First, resolution, false));
@@ -49,9 +52,7 @@ impl Spline {
             println!("{} {} {}", pt.x, pt.y, pt.z);
         }
         */
-        Ok(Spline {
-            points: points
-        })
+        Ok(Spline { points: points })
     }
 
     /// A sample of points along the spline, at the resolution given
