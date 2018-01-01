@@ -1,0 +1,52 @@
+$fn=5;
+union()
+{
+	hull()
+	{
+		translate([0,0,20])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=1);
+			}
+		}
+		translate([0,10,0])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=1);
+			}
+		}
+		translate([0,5,-10])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=1);
+			}
+		}
+	}
+	union()
+	{
+		translate([0,0,20])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=2);
+			}
+		}
+		translate([0,10,0])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=2);
+			}
+		}
+		translate([0,5,-10])
+		{
+			rotate(0,[0,0,1])
+			{
+				sphere(d=2);
+			}
+		}
+	}
+}

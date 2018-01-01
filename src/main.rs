@@ -66,7 +66,7 @@ fn main() {
             for plank in &flattened_planks {
                 doc.append_path(plank.render_2d());
             }
-            doc.save("plank.svg");
+            doc.save("plank.svg").unwrap();
 
             println!("ok");
         }

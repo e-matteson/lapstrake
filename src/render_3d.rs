@@ -1,10 +1,7 @@
-use std::f32::consts::PI;
-
 use failure::Error;
 
-use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
-use scad_dots::utils::{axis_radians, Corner3 as C3, P3, R3, V3};
-use scad_dots::harness::{check_model, Action};
+use scad_dots::core::{chain, Dot, DotAlign, DotSpec, Shape, Tree};
+use scad_dots::utils::{P3, R3};
 // use scad_dots::parse::scad_relative_eq;
 
 
@@ -83,56 +80,62 @@ impl ScadPath {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use scad_dots::core::mark;
+    use scad_dots::utils::{axis_radians, Corner3 as C3, V3};
+    use scad_dots::harness::{check_model, Action};
+    use std::f32::consts::PI;
 
+    #[test]
+    fn test_path_surface() {
+        check_model("test_path_surface", Action::Test, || {
+            let path = ScadPath::new(vec![
+                P3::new(0., 0., 20.),
+                P3::new(0., 10., 0.),
+                P3::new(0., 5., -10.),
+                ]).show_points();
+            path.link(PathStyle3::Solid)
+        })
+    }
 
-#[test]
-fn test_path_surface() {
-    check_model("test_path_surface", Action::Preview, || {
-        let path = ScadPath::new(vec![
-            P3::new(0., 0., 20.),
-            P3::new(0., 10., 0.),
-            P3::new(0., 5., -10.),
-        ]).show_points();
-        path.link(PathStyle3::Solid)
-    })
-}
+    #[test]
+    fn test_path_line_dots() {
+        check_model("test_path_line_dots", Action::Test, || {
+            let path = ScadPath::new(vec![
+                P3::new(0., 0., 0.),
+                P3::new(50., 50., 0.),
+                P3::new(100., 20., 75.),
+                ]).show_points();
+            path.link(PathStyle3::Line)
+        })
+    }
 
+    #[test]
+    fn test_dot_sphere() {
+        check_model("test_dot_sphere", Action::Test, || {
+            let n = Dot::new(
+                Shape::Sphere,
+                DotSpec {
+                    pos: P3::origin(),
+                    align: C3::P000.into(),
+                    size: 2.0,
+                    rot: axis_radians(V3::x_axis().unwrap(), PI / 4.),
+                },
+                );
+            Ok(dot![n])
+        })
+    }
 
-#[test]
-fn test_path_line_dots() {
-    check_model("test_path_line_dots", Action::Preview, || {
-        let path = ScadPath::new(vec![
-            P3::new(0., 0., 0.),
-            P3::new(50., 50., 0.),
-            P3::new(100., 20., 75.),
-        ]).show_points();
-        path.link(PathStyle3::Line)
-    })
-}
-
-#[test]
-fn test_dot_sphere() {
-    check_model("test_dot_sphere", Action::Test, || {
-        let n = Dot::new(
-            Shape::Sphere,
-            DotSpec {
-                pos: P3::origin(),
-                align: C3::P000.into(),
-                size: 2.0,
-                rot: axis_radians(V3::x_axis().unwrap(), PI / 4.),
-            },
-        );
-        Ok(dot![n])
-    })
-}
-
-#[test]
-fn test_surface() {
-    check_model("test_surface", Action::Test, || {
-        Ok(hull![
-            mark(P3::origin(), 1.),
-            mark(P3::new(10., 0., 0.,), 1.),
-            mark(P3::new(10., 10., 0.), 1.)
-        ])
-    })
+    #[test]
+    fn test_surface() {
+        check_model("test_surface", Action::Test, || {
+            Ok(hull![
+                mark(P3::origin(), 1.),
+                mark(P3::new(10., 0., 0.,), 1.),
+                mark(P3::new(10., 10., 0.), 1.)
+                    ])
+        })
+    }
 }

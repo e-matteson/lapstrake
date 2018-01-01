@@ -57,7 +57,7 @@ impl FlattenedPlank {
         bottom_line.reverse();
 
         let mut points = vec![];
-        points.extend(self.top_line.clone());
+        points.extend(top_line);
         points.extend(bottom_line);
         points.push(self.top_line[0]);
         points
