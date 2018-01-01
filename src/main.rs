@@ -9,6 +9,7 @@ extern crate scad_dots;
 #[macro_use]
 extern crate scad_dots_derive;
 extern crate svg;
+extern crate nalgebra;
 
 pub mod unit;
 pub mod spec;
@@ -27,13 +28,16 @@ use scad_dots::core::{chain, mark, Dot, DotAlign, DotSpec, Shape, Tree};
 use scad_dots::utils::{axis_radians, Corner3 as C3, P3, R3, V3};
 use scad_dots::harness::{check_model, preview_model, Action};
 
-// TODO: temp
+use unit::Feet;
 use spec::Spec;
 use spec::Config;
 use render_2d::SvgDoc;
 
 
-const RESOLUTION: usize = 20;
+const STATION_RESOLUTION: usize = 20;
+const PLANK_RESOLUTION:   usize = 30;
+const NUM_PLANKS: usize = 10;
+const OVERLAP: Feet = Feet{ feet: 0, inches: 3, eighths: 0 };
 
 fn main() {
     match read_data(Path::new("data.csv")) {
@@ -42,18 +46,28 @@ fn main() {
                 config: Config { stuff: 0 },
                 data: data,
             };
-            let hull = spec.get_hull(RESOLUTION).unwrap();
+            let hull = spec.get_hull(STATION_RESOLUTION).unwrap();
             //            hull.stations[3].render_3d();
-            let mut doc = SvgDoc::new();
 
+            // Show the station splines
+            let mut doc = SvgDoc::new();
             for station in &hull.stations {
                 doc.append_path(station.render_spline_2d());
                 doc.append_path(station.render_points_2d());
             }
             doc.save("out.svg");
-            // let mut trees = Vec::new();
-            //     trees.push(station.render_3d().unwrap());
-            // preview_model(&Tree::Union(trees)).unwrap();
+
+            // Show a sample plank.
+            let planks = hull.get_planks(
+                NUM_PLANKS, OVERLAP.into(), PLANK_RESOLUTION).unwrap();
+            let flattened_planks: Vec<_> = planks.iter()
+                .map(|plank| plank.flatten().unwrap())
+                .collect();
+            let mut doc = SvgDoc::new();
+            for plank in &flattened_planks {
+                doc.append_path(plank.render_2d());
+            }
+            doc.save("plank.svg");
 
             println!("ok");
         }
