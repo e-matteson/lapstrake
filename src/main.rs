@@ -2,9 +2,6 @@
 
 
 extern crate csv;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 #[macro_use]
 extern crate failure;
 extern crate nalgebra;
@@ -12,6 +9,9 @@ extern crate nalgebra;
 extern crate scad_dots;
 #[macro_use]
 extern crate scad_dots_derive;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate svg;
 
 pub mod unit;
@@ -57,9 +57,11 @@ fn main() {
     check_error(doc.save("half-breadth.svg"));
 
     // Show all planks overlayed on each other
-    let planks = check_error(hull.get_planks(NUM_PLANKS,
-                                             OVERLAP.into(),
-                                             PLANK_RESOLUTION));
+    let planks = check_error(hull.get_planks(
+        NUM_PLANKS,
+        OVERLAP.into(),
+        PLANK_RESOLUTION,
+    ));
     let flattened_planks: Vec<_> = planks
         .iter()
         .map(|plank| check_error(plank.flatten()))
@@ -75,7 +77,7 @@ fn main() {
 
 fn check_error<T>(result: Result<T, Error>) -> T {
     match result {
-        Ok(ans)  => ans,
+        Ok(ans) => ans,
         Err(err) => {
             print_error(err);
             process::exit(1);

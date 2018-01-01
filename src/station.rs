@@ -274,9 +274,11 @@ impl Spec {
                 match *breadth {
                     BreadthLine::Sheer => (),
                     BreadthLine::Wale => (),
-                    BreadthLine::ButOut(breadth) => if let Some(height) = row[i] {
-                        points.push(point(position, breadth, height));
-                    },
+                    BreadthLine::ButOut(breadth) => {
+                        if let Some(height) = row[i] {
+                            points.push(point(position, breadth, height));
+                        }
+                    }
                 }
             }
             for &(ref height, ref row) in &data.breadths {
@@ -313,7 +315,9 @@ impl Spec {
             match *breadth {
                 BreadthLine::Sheer => (),
                 BreadthLine::Wale => (),
-                BreadthLine::ButOut(breadth) => stored_breadths.push(breadth as f32),
+                BreadthLine::ButOut(breadth) => {
+                    stored_breadths.push(breadth as f32)
+                }
             }
         }
         stored_breadths
