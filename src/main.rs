@@ -42,7 +42,7 @@ fn main() {
     // Show the half-breadth curves for each station/cross-section
     let mut doc = SvgDoc::new();
     doc.append_paths(hull.draw_half_breadths());
-    check_error(doc.save("half-breadth.svg"));
+    check_error(doc.save("images/half-breadth.svg"));
 
     // Show all planks overlayed on each other
     let planks = check_error(hull.get_planks());
@@ -54,7 +54,7 @@ fn main() {
     for plank in &flattened_planks {
         doc.append_path(plank.render_2d());
     }
-    check_error(doc.save("plank.svg"));
+    check_error(doc.save("images/plank.svg"));
 
     println!("ok");
 }
