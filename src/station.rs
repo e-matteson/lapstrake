@@ -123,6 +123,11 @@ impl Plank {
         }
         Ok((left_len, quads))
     }
+    pub fn outline(&self) -> Vec<P3> {
+        let mut all_points = self.top_line.sample();
+        all_points.extend(&self.bottom_line.sample());
+        all_points
+    }
 }
 
 struct Quad {
@@ -232,6 +237,17 @@ impl Hull {
             );
         }
         paths
+    }
+
+    pub fn render_stations(&self) -> Result<Tree, Error> {
+        let mut trees = Vec::new();
+        for station in &self.stations {
+            trees.push(ScadPath::new(station.points.clone())
+                .stroke(10.0)
+                .show_points()
+                .link(PathStyle3::Line)?)
+        }
+        Ok(Tree::Union(trees))
     }
 }
 
