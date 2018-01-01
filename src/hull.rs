@@ -1,14 +1,15 @@
+use nalgebra::{normalize, Rotation2};
 use scad_dots::utils::{Axis, P2, P3};
+use scad_dots::core::{MinMaxCoord, Tree};
 use failure::Error;
 
 use spec::{BreadthLine, HeightLine, Spec};
 use spline::Spline;
-use nalgebra::{normalize, Rotation2};
 use scad_dots::utils::{distance, rotation_between};
 use render_3d::{PathStyle3, ScadPath};
 use render_2d::{PathStyle2, SvgColor, SvgPath};
+use util::project_points;
 
-use scad_dots::core::{MinMaxCoord, Tree};
 
 // How near points must be to be considered equal, in 1/8th of an inch.
 const EQUALITY_THRESHOLD: f32 = 8.0;
@@ -29,7 +30,6 @@ pub struct Hull {
 #[derive(MinMaxCoord)]
 pub struct Station {
     pub points: Vec<P3>,
-    #[min_max_coord(ignore)] pub position: f32,
     #[min_max_coord(ignore)] pub spline: Spline,
 }
 
@@ -228,12 +228,12 @@ impl Hull {
                 points = reflect3(Axis::Y, &points);
             }
             paths.push(
-                SvgPath::new(project(Axis::X, &samples))
+                SvgPath::new(project_points(Axis::X, &samples))
                     .stroke(SvgColor::Black, 2.0)
                     .style(PathStyle2::Line),
             );
             paths.push(
-                SvgPath::new(project(Axis::X, &points))
+                SvgPath::new(project_points(Axis::X, &points))
                     .stroke(SvgColor::Black, 2.0)
                     .style(PathStyle2::Dots),
             );
@@ -263,13 +263,13 @@ impl Station {
     }
 
     pub fn render_spline_2d(&self) -> SvgPath {
-        SvgPath::new(project(Axis::X, &self.spline.sample()))
+        SvgPath::new(project_points(Axis::X, &self.spline.sample()))
             .stroke(SvgColor::Black, 2.0)
             .style(PathStyle2::Line)
     }
 
     pub fn render_points_2d(&self) -> SvgPath {
-        SvgPath::new(project(Axis::X, &self.points))
+        SvgPath::new(project_points(Axis::X, &self.points))
             .stroke(SvgColor::Green, 2.0)
             .style(PathStyle2::Dots)
     }
@@ -312,7 +312,6 @@ impl Spec {
             let points = sort_and_remove_duplicates(points);
             // Construct the station (cross section).
             let station = Station {
-                position: position as f32,
                 points: points.clone(),
                 spline: Spline::new(points, resolution)?,
             };
@@ -395,11 +394,3 @@ fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
         .collect()
 }
 
-fn project(axis: Axis, points: &[P3]) -> Vec<P2> {
-    let func = |p: &P3| match axis {
-        Axis::X => P2::new(p.y, p.z),
-        Axis::Y => P2::new(p.x, p.z),
-        Axis::Z => P2::new(p.x, p.y),
-    };
-    points.iter().map(func).collect()
-}
