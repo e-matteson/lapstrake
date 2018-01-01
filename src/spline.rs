@@ -11,6 +11,7 @@ use catmullrom::Segment::{First, Middle, Last};
 
 
 /// A spline with any number of points.
+#[derive(Debug, Clone)]
 pub struct Spline {
     points: Vec<P3>
 }
