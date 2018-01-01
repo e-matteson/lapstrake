@@ -18,7 +18,7 @@ pub mod spec;
 pub mod load;
 pub mod catmullrom;
 mod spline;
-mod station;
+mod hull;
 mod render_3d;
 mod render_2d;
 
