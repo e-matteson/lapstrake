@@ -42,7 +42,7 @@ const OVERLAP: Feet = Feet {
 };
 
 fn main() {
-    match read_data(Path::new("data.csv")) {
+    match read_data(Path::new("data2.csv")) {
         Ok(data) => {
             let spec = Spec {
                 config: Config { stuff: 0 },
