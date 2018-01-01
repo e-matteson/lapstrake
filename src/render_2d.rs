@@ -8,7 +8,6 @@ use svg::node::Value;
 use svg::node::element::{Circle, Group, Path, Rectangle};
 use svg::node::element::path::Data;
 
-
 /// Example:
 ///
 /// ```
@@ -58,7 +57,6 @@ pub struct Bound {
     low: P2,
     high: P2,
 }
-
 
 #[derive(Clone, Copy, Debug)]
 struct Stroke {
@@ -323,7 +321,6 @@ impl SvgRect {
     }
 }
 
-
 impl Bound {
     fn new() -> Bound {
         Bound::from_origin(0., 0.)
@@ -362,7 +359,6 @@ impl Bound {
     }
 }
 
-
 // #[test]
 // fn test_svg() {
 //     let data = Data::new()
@@ -386,7 +382,6 @@ impl Bound {
 //         document.to_string()
 //     );
 // }
-
 
 impl Into<Value> for SvgColor {
     fn into(self) -> Value {

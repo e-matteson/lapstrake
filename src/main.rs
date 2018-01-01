@@ -1,6 +1,5 @@
 #![feature(slice_patterns)]
 
-
 extern crate csv;
 #[macro_use]
 extern crate failure;
@@ -25,31 +24,20 @@ mod render_2d;
 
 use std::process;
 use std::path::Path;
-use load::read_data;
+use load::{read_config, read_data};
 use failure::Error;
 
-use unit::Feet;
 use spec::Spec;
-use spec::Config;
 use render_2d::SvgDoc;
 
-
-const STATION_RESOLUTION: usize = 20;
-const PLANK_RESOLUTION: usize = 1;
-const NUM_PLANKS: usize = 10;
-const OVERLAP: Feet = Feet {
-    feet: 0,
-    inches: 3,
-    eighths: 0,
-};
-
 fn main() {
+    let config = check_error(read_config(Path::new("config.csv")));
     let data = check_error(read_data(Path::new("data.csv")));
     let spec = Spec {
-        config: Config { stuff: 0 },
+        config: config,
         data: data,
     };
-    let hull = check_error(spec.get_hull(STATION_RESOLUTION));
+    let hull = check_error(spec.get_hull());
 
     // Show the half-breadth curves for each station/cross-section
     let mut doc = SvgDoc::new();
@@ -57,11 +45,7 @@ fn main() {
     check_error(doc.save("half-breadth.svg"));
 
     // Show all planks overlayed on each other
-    let planks = check_error(hull.get_planks(
-        NUM_PLANKS,
-        OVERLAP.into(),
-        PLANK_RESOLUTION,
-    ));
+    let planks = check_error(hull.get_planks());
     let flattened_planks: Vec<_> = planks
         .iter()
         .map(|plank| check_error(plank.flatten()))

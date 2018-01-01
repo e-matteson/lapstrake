@@ -9,7 +9,6 @@ use failure::Error;
 use catmullrom::CentripetalCatmullRom;
 use catmullrom::Segment::{First, Last, Middle};
 
-
 /// A spline with any number of points.
 #[derive(Debug, Clone)]
 pub struct Spline {

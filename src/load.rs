@@ -11,7 +11,6 @@ use failure::{Error, ResultExt};
 use unit::*;
 use spec::*;
 
-
 /// Read the data file, which contains reference points along cross
 /// sections of the hull.
 pub fn read_data(path: &Path) -> Result<Data, Error> {
@@ -25,16 +24,17 @@ pub fn read_config(path: &Path) -> Result<Config, Error> {
     let reader = csv::Reader::from_path(path)
         .context(format!("Could not read file {:?}.", path))?;
     Ok(read_config_from_csv(reader)
-       .context(format!("Could not parse file {:?}.", path))?)
+        .context(format!("Could not parse file {:?}.", path))?)
 }
 
 fn read_config_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Config, Error>
-    where T: io::Read
+where
+    T: io::Read,
 {
     println!("Parsing config file.");
     match csv.deserialize().next() {
         None => bail!("Found no rows in config file."),
-        Some(row) => Ok(row?)
+        Some(row) => Ok(row?),
     }
 }
 
@@ -82,7 +82,10 @@ where
                         read_section(&mut recs, &mut diagonals)
                     }
                 }
-            }.context(format!("Could not parse section {:?}.", section))?,
+            }.context(format!(
+                "Could not parse section {:?}.",
+                section
+            ))?,
         };
     }
 

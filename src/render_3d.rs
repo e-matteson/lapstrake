@@ -4,7 +4,6 @@ use scad_dots::core::{chain, Dot, DotAlign, DotSpec, Shape, Tree};
 use scad_dots::utils::{P3, R3};
 // use scad_dots::parse::scad_relative_eq;
 
-
 /// Example:
 ///
 /// ```
@@ -16,7 +15,6 @@ use scad_dots::utils::{P3, R3};
 ///
 /// preview_model(&path.link(PathStyle3::Line)?)?;
 /// ```
-
 
 pub struct ScadPath {
     points: Vec<P3>,
@@ -63,7 +61,6 @@ impl ScadPath {
         }
         Ok(tree)
     }
-
 
     fn make_dots(&self, diameter: f32) -> Vec<Tree> {
         let mut dots = Vec::new();

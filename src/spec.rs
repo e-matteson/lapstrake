@@ -5,7 +5,6 @@ use failure::{Error, ResultExt};
 
 use unit::*;
 
-
 /// The spec for the hull of a ship, plus configuration options.
 #[derive(Debug)]
 pub struct Spec {
@@ -16,7 +15,16 @@ pub struct Spec {
 /// Configuration options.
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub stuff: u8,
+    pub station_resolution: usize,
+    pub plank_resolution: usize,
+    pub number_of_planks: usize,
+    plank_overlap: String,
+}
+
+impl Config {
+    pub fn plank_overlap(&self) -> Result<usize, Error> {
+        Ok(Feet::parse(&self.plank_overlap)?.into())
+    }
 }
 
 /// A standard set of reference points for the hull shape.

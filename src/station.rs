@@ -10,7 +10,6 @@ use render_2d::{PathStyle2, SvgColor, SvgPath};
 
 use scad_dots::core::{MinMaxCoord, Tree};
 
-
 // How near points must be to be considered equal, in 1/8th of an inch.
 const EQUALITY_THRESHOLD: f32 = 8.0;
 
@@ -20,6 +19,9 @@ pub struct Hull {
     pub stations: Vec<Station>,
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
+    #[min_max_coord(ignore)] num_planks: usize,
+    #[min_max_coord(ignore)] overlap: usize,
+    #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
 }
 
@@ -143,23 +145,23 @@ impl Hull {
     /// `overlap` is how much each plank should overlap the next.
     /// Planks are meant to be layed out from the bottom of the ship
     /// to the top; as a result, the bottommost plank has no overlap.
-    pub fn get_planks(
-        &self,
-        n: usize,
-        overlap: usize,
-        resolution: usize,
-    ) -> Result<Vec<Plank>, Error> {
+    pub fn get_planks(&self) -> Result<Vec<Plank>, Error> {
+        let n = self.num_planks;
         let mut planks = vec![];
         for i in 0..n {
             let f_bottom = i as f32 / n as f32;
             let f_top = (i + 1) as f32 / n as f32;
             let at_end = i + 1 == n;
-            let offset = if at_end { 0 } else { overlap };
+            let offset = if at_end {
+                0
+            } else {
+                self.overlap
+            };
             let bottom_line = self.get_line(f_bottom, 0);
             let top_line = self.get_line(f_top, offset);
             planks.push(Plank {
-                bottom_line: Spline::new(bottom_line, resolution)?,
-                top_line: Spline::new(top_line, resolution)?,
+                bottom_line: Spline::new(bottom_line, self.plank_resolution)?,
+                top_line: Spline::new(top_line, self.plank_resolution)?,
             });
         }
         Ok(planks)
@@ -257,11 +259,10 @@ impl Station {
     }
 }
 
-
-
 impl Spec {
-    pub fn get_hull(&self, resolution: usize) -> Result<Hull, Error> {
+    pub fn get_hull(&self) -> Result<Hull, Error> {
         let data = &self.data;
+        let resolution = self.config.station_resolution;
         let mut stations = vec![];
         for (i, &position) in data.positions.iter().enumerate() {
             let mut points = vec![];
@@ -306,6 +307,9 @@ impl Spec {
             stations: stations,
             breadths: self.get_breadths(),
             heights: self.get_heights(),
+            num_planks: self.config.number_of_planks,
+            overlap: self.config.plank_overlap()?,
+            plank_resolution: self.config.plank_resolution,
         })
     }
 
@@ -334,7 +338,6 @@ impl Spec {
         stored_heights
     }
 }
-
 
 fn sort_and_remove_duplicates(mut points: Vec<P3>) -> Vec<P3> {
     points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());

@@ -3,7 +3,6 @@
 use scad_dots::utils::P3;
 use scad_dots::utils::distance;
 
-
 /// A nice cubic interpolation between four points.
 pub struct CentripetalCatmullRom {
     // The four points to interpolate between.
@@ -104,7 +103,6 @@ impl CentripetalCatmullRom {
         P3::from_coordinates(left.coords + right.coords)
     }
 }
-
 
 fn knot(points: &[P3; 4], i: usize, prev_knot: f32) -> f32 {
     // 'centripetal' means alpha = 1/2, so take sqrt.

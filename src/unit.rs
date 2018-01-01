@@ -4,7 +4,6 @@ use std::fmt;
 use std::str::FromStr;
 use failure::{Error, ResultExt};
 
-
 /// Feet, inches, and eighths of an inch.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Feet {
@@ -69,7 +68,6 @@ impl Feet {
         }
     }
 }
-
 
 impl Into<usize> for Feet {
     fn into(self) -> usize {
