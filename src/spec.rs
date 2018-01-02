@@ -1,5 +1,7 @@
 //! Specs for the ship hull.
 
+use std::fmt;
+use std::cmp;
 use std::str::FromStr;
 use failure::{Error, ResultExt};
 
@@ -33,7 +35,7 @@ pub struct Data {
     /// The names of the stations (cross sections of the hull).
     pub stations: Vec<String>,
     /// The locations of each of the stations.
-    pub positions: Vec<usize>,
+    pub positions: Vec<DataRow<HeightLine>>,
     /// For each station,
     /// the height above base
     /// at each half-breadth from center.
@@ -50,56 +52,63 @@ pub struct Data {
 /// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
 pub type DataRow<T> = (T, Vec<Option<usize>>);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreadthLine {
     Sheer,
     Wale,
     ButOut(usize),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeightLine {
     Sheer,
     WLUp(usize),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagonalLine {
     A,
     B,
 }
 
 impl Spec {
-    pub fn get_sheer_breadth(
+    pub fn get_station_position(
         &self,
-        station_index: usize,
+        station: usize,
+        line: HeightLine,
     ) -> Result<usize, Error> {
-        for &(ref height, ref row) in &self.data.breadths {
-            match *height {
-                HeightLine::Sheer => match row[station_index] {
-                    Some(x) => return Ok(x),
-                    None => bail!("Sheer is required, but was omitted."),
-                },
-                _ => (),
-            }
-        }
-        bail!("Did not find sheer breadth.")
+        Spec::lookup(&self.data.positions, station, line)
     }
 
-    pub fn get_sheer_height(
-        &self,
+    pub fn get_sheer_breadth(&self, station: usize) -> Result<usize, Error> {
+        Spec::lookup(&self.data.breadths, station, HeightLine::Sheer)
+    }
+
+    pub fn get_sheer_height(&self, station: usize) -> Result<usize, Error> {
+        Spec::lookup(&self.data.heights, station, BreadthLine::Sheer)
+    }
+
+    fn lookup<M>(
+        rows: &Vec<DataRow<M>>,
         station_index: usize,
-    ) -> Result<usize, Error> {
-        for &(ref breadth, ref row) in &self.data.heights {
-            match *breadth {
-                BreadthLine::Sheer => match row[station_index] {
-                    Some(x) => return Ok(x),
-                    None => bail!("Sheer is required, but was omitted."),
-                },
-                _ => (),
+        measurement: M,
+    ) -> Result<usize, Error>
+    where
+        M: fmt::Debug + cmp::Eq + Copy,
+    {
+        for &(ref x, ref row) in rows.iter() {
+            if *x == measurement {
+                match row[station_index] {
+                    Some(m) => return Ok(m),
+                    None => (),
+                }
             }
         }
-        bail!("Did not find sheer height.")
+        bail!(
+            "Could not find a measurement for {:?} at station index {}",
+            measurement,
+            station_index
+        );
     }
 }
 

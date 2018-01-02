@@ -56,17 +56,8 @@ where
 
     let mut recs = csv.records().peekable();
 
-    // Read Positions
-    println!("Parsing positions.");
-    let mut positions = vec![];
-    let csv_positions = recs.next();
-    let csv_positions = csv_positions.expect("Could not read positions.")?;
-    let csv_positions = csv_positions.iter().skip(1);
-    for csv_position in csv_positions {
-        positions.push(Feet::parse(csv_position)?.into());
-    }
-
     // Read Sections
+    let mut positions = vec![];
     let mut heights = vec![];
     let mut breadths = vec![];
     let mut diagonals = vec![];
@@ -76,6 +67,9 @@ where
             Some(section) => {
                 println!("Parsing section {:?}.", section);
                 match section {
+                    Section::Positions => {
+                        read_section(&mut recs, &mut positions)
+                    }
                     Section::Heights => read_section(&mut recs, &mut heights),
                     Section::Breadths => read_section(&mut recs, &mut breadths),
                     Section::Diagonals => {
@@ -148,6 +142,7 @@ where
             let mut row = row.iter();
             match row.next() {
                 Some(name) => match name.to_lowercase().as_str() {
+                    "fore-aft position" => Ok(Some(Section::Positions)),
                     "height" => Ok(Some(Section::Heights)),
                     "breadth" => Ok(Some(Section::Breadths)),
                     "diagonal" => Ok(Some(Section::Diagonals)),
@@ -155,7 +150,7 @@ where
                         concat!(
                             "Did not recognize the name {}. ",
                             "Expected one of these section names: ",
-                            "Height, Breadth, Diagonal."
+                            "Height, Breadth, Diagonal, Fore-Aft Position."
                         ),
                         name
                     ),
@@ -169,6 +164,7 @@ where
 
 #[derive(Debug)]
 enum Section {
+    Positions,
     Heights,
     Breadths,
     Diagonals,

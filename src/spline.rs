@@ -7,7 +7,7 @@ use failure::Error;
 
 use catmullrom::CentripetalCatmullRom;
 use catmullrom::Segment::{First, Last, Middle};
-use util::{project_points, project};
+use util::{project, project_points};
 
 /// A spline with any number of points.
 #[derive(Debug, Clone)]
@@ -53,7 +53,6 @@ impl Spline {
         */
         Ok(Spline { points: points })
     }
-
 
     /// A sample of points along the spline, at the resolution given
     /// at construction.

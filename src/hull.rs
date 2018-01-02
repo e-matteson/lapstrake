@@ -10,7 +10,6 @@ use render_3d::{PathStyle3, ScadPath};
 use render_2d::{PathStyle2, SvgColor, SvgPath};
 use util::project_points;
 
-
 // How near points must be to be considered equal, in 1/8th of an inch.
 const EQUALITY_THRESHOLD: f32 = 8.0;
 
@@ -18,6 +17,7 @@ const EQUALITY_THRESHOLD: f32 = 8.0;
 #[derive(MinMaxCoord)]
 pub struct Hull {
     pub stations: Vec<Station>,
+    #[min_max_coord(ignore)] pub wale: Vec<P2>, // {x, z}
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] num_planks: usize,
@@ -280,30 +280,40 @@ impl Spec {
         let data = &self.data;
         let resolution = self.config.station_resolution;
         let mut stations = vec![];
-        for (i, &position) in data.positions.iter().enumerate() {
+        let mut wale = vec![];
+        for i in 0..data.stations.len() {
             let mut points = vec![];
             // Add the sheer point.
             let sheer_breadth = self.get_sheer_breadth(i)?;
             let sheer_height = self.get_sheer_height(i)?;
-            points.push(point(position, sheer_breadth, sheer_height));
-            // Add all other points.
+            let sheer_posn = self.get_station_position(i, HeightLine::Sheer)?;
+            points.push(point(sheer_posn, sheer_breadth, sheer_height));
+            // Add the height measurements. Assume they are at the
+            // positions given by the sheer for that station.
             for &(ref breadth, ref row) in &data.heights {
-                match *breadth {
-                    BreadthLine::Sheer => (),
-                    BreadthLine::Wale => (),
-                    BreadthLine::ButOut(breadth) => {
-                        if let Some(height) = row[i] {
-                            points.push(point(position, breadth, height));
+                let posn = self.get_station_position(i, HeightLine::Sheer)?;
+                if let Some(height) = row[i] {
+                    match *breadth {
+                        BreadthLine::Sheer => (),
+                        BreadthLine::Wale => {
+                            wale.push(P2::new(posn as f32, height as f32));
+                        }
+                        BreadthLine::ButOut(breadth) => {
+                            points.push(point(posn, breadth, height));
                         }
                     }
                 }
             }
+            // Add the breadth measurements.
             for &(ref height, ref row) in &data.breadths {
-                match *height {
-                    HeightLine::Sheer => (),
-                    HeightLine::WLUp(height) => if let Some(breadth) = row[i] {
-                        points.push(point(position, breadth, height));
-                    },
+                let posn = self.get_station_position(i, *height)?;
+                if let Some(breadth) = row[i] {
+                    match *height {
+                        HeightLine::Sheer => (),
+                        HeightLine::WLUp(height) => {
+                            points.push(point(posn, breadth, height));
+                        }
+                    }
                 }
             }
             // TODO: diagonals
@@ -322,6 +332,7 @@ impl Spec {
             stations: stations,
             breadths: self.get_breadths(),
             heights: self.get_heights(),
+            wale: wale,
             num_planks: self.config.number_of_planks,
             overlap: self.config.plank_overlap()?,
             plank_resolution: self.config.plank_resolution,
@@ -393,4 +404,3 @@ fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
         })
         .collect()
 }
-
