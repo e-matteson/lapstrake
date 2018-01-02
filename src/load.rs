@@ -66,7 +66,7 @@ where
     }
     Ok(Planks {
         stations: stations,
-        planks_locations: planks,
+        plank_locations: planks,
     })
 }
 

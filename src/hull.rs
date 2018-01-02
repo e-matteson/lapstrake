@@ -4,7 +4,7 @@ use scad_dots::core::{MinMaxCoord, Tree};
 use failure::Error;
 
 use unit::Feet;
-use spec::{BreadthLine, HeightLine, Spec};
+use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
 use scad_dots::utils::{distance, rotation_between};
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
@@ -21,7 +21,7 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub wale: Vec<P2>, // {x, z}
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
-    #[min_max_coord(ignore)] num_planks: usize,
+    #[min_max_coord(ignore)] planks: Planks,
     #[min_max_coord(ignore)] overlap: f32,
     #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
@@ -30,6 +30,7 @@ pub struct Hull {
 /// A cross-section of the hull.
 #[derive(MinMaxCoord)]
 pub struct Station {
+    #[min_max_coord(ignore)] name: String,
     pub points: Vec<P3>,
     #[min_max_coord(ignore)] pub spline: Spline,
 }
@@ -156,21 +157,29 @@ impl Hull {
     /// Planks are meant to be layed out from the bottom of the ship
     /// to the top; as a result, the bottommost plank has no overlap.
     pub fn get_planks(&self) -> Result<Vec<Plank>, Error> {
-        let n = self.num_planks;
+        let n = self.planks.plank_locations.len() - 1;
         let mut planks = vec![];
         for i in 0..n {
-            let f_bottom = i as f32 / n as f32;
-            let f_top = (i + 1) as f32 / n as f32;
             let at_end = i + 1 == n;
             let offset = if at_end {
                 0.
             } else {
                 self.overlap
             };
-            let bottom_line = self.get_line(f_bottom, 0.);
-            let top_line = self.get_line(f_top, offset);
+            let bot_locs = &self.planks.plank_locations[i];
+            let top_locs = &self.planks.plank_locations[i + 1];
+            let mut bot_line = vec![];
+            let mut top_line = vec![];
+            for (j, ref station) in self.planks.stations.iter().enumerate() {
+                let bot_f = bot_locs[j];
+                let top_f = top_locs[j];
+                if let (Some(bot_f), Some(top_f)) = (bot_f, top_f) {
+                    bot_line.push(self.get_point(bot_f, 0.0, station)?);
+                    top_line.push(self.get_point(top_f, offset, station)?);
+                }
+            }
             planks.push(Plank {
-                bottom_line: Spline::new(bottom_line, self.plank_resolution)?,
+                bottom_line: Spline::new(bot_line, self.plank_resolution)?,
                 top_line: Spline::new(top_line, self.plank_resolution)?,
             });
         }
@@ -188,6 +197,38 @@ impl Hull {
                 station.spline.at(dist)
             })
             .collect()
+    }
+
+    // Get a position on the station that is a constant fraction `f`
+    // of the distance along the edge of the station.
+    fn get_station(&self, station_name: &str) -> Result<&Station, Error> {
+        for station in &self.stations {
+            if station.name == station_name {
+                return Ok(station);
+            }
+        }
+        bail!("Station {} not found.", station_name);
+    }
+
+    // Get a point a fraction `f` of the way along the curve of the
+    // given station (plus offset).
+    fn get_point(
+        &self,
+        f: f32,
+        offset: f32,
+        station: &PlankStation,
+    ) -> Result<P3, Error> {
+        match station {
+            &PlankStation::Station(ref station_name) => {
+                let station = self.get_station(station_name)?;
+                let len = station.spline.length();
+                let dist = f * len + offset;
+                Ok(station.spline.at(dist))
+            }
+            &PlankStation::Position(posn) => {
+                unimplemented!();
+            }
+        }
     }
 
     pub fn draw_height_breadth_grid(&self) -> Vec<SvgPath> {
@@ -328,6 +369,7 @@ impl Spec {
             let points = remove_duplicates(points);
             // Construct the station (cross section).
             let station = Station {
+                name: data.stations[i].to_string(),
                 points: points.clone(),
                 spline: Spline::new(points, resolution)?,
             };
@@ -339,7 +381,7 @@ impl Spec {
             breadths: self.get_breadths(),
             heights: self.get_heights(),
             wale: wale,
-            num_planks: self.config.number_of_planks,
+            planks: self.planks.clone(),
             overlap: self.config.plank_overlap()?.into(),
             plank_resolution: self.config.plank_resolution,
         })

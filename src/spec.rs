@@ -39,10 +39,10 @@ pub struct Data {
 pub type DataRow<T> = (T, Vec<Option<Feet>>);
 
 /// Where planks should lie on the hull.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Planks {
     pub stations: Vec<PlankStation>,
-    pub planks_locations: Vec<PlankRow>,
+    pub plank_locations: Vec<PlankRow>,
 }
 
 /// For a given plank, specifies where that plank should lie (as a
@@ -52,7 +52,7 @@ pub type PlankRow = Vec<Option<f32>>;
 
 /// A plank's location can be specified either along an existing
 /// station, or along a cross-section of constant fore-aft position.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PlankStation {
     Station(String),
     Position(Feet),
