@@ -176,14 +176,15 @@ impl Hull {
     /// Get a line across the hull that is a constant fraction `f`
     /// of the distance along the edge of each cross section.
     fn get_line(&self, f: f32, offset: f32) -> Vec<P3> {
-        self.stations
+        let pts = self.stations
             .iter()
             .map(|station| {
                 let len = station.spline.length();
                 let dist = f * len + offset;
                 station.spline.at(dist)
             })
-            .collect()
+            .collect();
+        remove_duplicates(pts)
     }
 
     pub fn draw_height_breadth_grid(&self) -> Vec<SvgPath> {
@@ -320,7 +321,8 @@ impl Spec {
             // TODO: diagonals
             // The points are out of order, and may contain duplicates.
             // Sort them and remove the duplicates.
-            let points = sort_and_remove_duplicates(points);
+            points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+            let points = remove_duplicates(points);
             // Construct the station (cross section).
             let station = Station {
                 points: points.clone(),
@@ -366,8 +368,7 @@ impl Spec {
     }
 }
 
-fn sort_and_remove_duplicates(mut points: Vec<P3>) -> Vec<P3> {
-    points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
+fn remove_duplicates(points: Vec<P3>) -> Vec<P3> {
     let mut good_points = vec![];
     good_points.push(points[0]);
     let mut prev_point = points[0];
