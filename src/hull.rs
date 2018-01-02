@@ -6,13 +6,12 @@ use failure::Error;
 use spec::{BreadthLine, HeightLine, Spec};
 use spline::Spline;
 use scad_dots::utils::{distance, rotation_between};
-use render_3d::{PathStyle3, ScadPath};
+use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{PathStyle2, SvgColor, SvgPath};
 use util::project_points;
 
-
-// How near points must be to be considered equal, in 1/8th of an inch.
-const EQUALITY_THRESHOLD: f32 = 8.0;
+// How near points must be to be considered equal, in feet
+const EQUALITY_THRESHOLD: f32 = 0.001;
 
 /// A ship's hull.
 #[derive(MinMaxCoord)]
@@ -21,7 +20,7 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] num_planks: usize,
-    #[min_max_coord(ignore)] overlap: usize,
+    #[min_max_coord(ignore)] overlap: f32,
     #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
 }
@@ -158,11 +157,11 @@ impl Hull {
             let f_top = (i + 1) as f32 / n as f32;
             let at_end = i + 1 == n;
             let offset = if at_end {
-                0
+                0.
             } else {
                 self.overlap
             };
-            let bottom_line = self.get_line(f_bottom, 0);
+            let bottom_line = self.get_line(f_bottom, 0.);
             let top_line = self.get_line(f_top, offset);
             planks.push(Plank {
                 bottom_line: Spline::new(bottom_line, self.plank_resolution)?,
@@ -174,12 +173,12 @@ impl Hull {
 
     /// Get a line across the hull that is a constant fraction `f`
     /// of the distance along the edge of each cross section.
-    fn get_line(&self, f: f32, offset: usize) -> Vec<P3> {
+    fn get_line(&self, f: f32, offset: f32) -> Vec<P3> {
         self.stations
             .iter()
             .map(|station| {
                 let len = station.spline.length();
-                let dist = f * len + offset as f32;
+                let dist = f * len + offset;
                 station.spline.at(dist)
             })
             .collect()
@@ -245,7 +244,7 @@ impl Hull {
         let mut trees = Vec::new();
         for station in &self.stations {
             trees.push(ScadPath::new(station.points.clone())
-                .stroke(10.0)
+                .stroke(0.1)
                 .show_points()
                 .link(PathStyle3::Line)?)
         }
@@ -256,7 +255,7 @@ impl Hull {
 impl Station {
     pub fn render_3d(&self) -> Result<Tree, Error> {
         let path = ScadPath::new(self.points.clone())
-            .stroke(10.0)
+            .stroke(SCAD_STROKE)
             .show_points()
             .link(PathStyle3::Line);
         path
@@ -285,7 +284,11 @@ impl Spec {
             // Add the sheer point.
             let sheer_breadth = self.get_sheer_breadth(i)?;
             let sheer_height = self.get_sheer_height(i)?;
-            points.push(point(position, sheer_breadth, sheer_height));
+            points.push(P3::new(
+                position.into(),
+                sheer_breadth.into(),
+                sheer_height.into(),
+            ));
             // Add all other points.
             for &(ref breadth, ref row) in &data.heights {
                 match *breadth {
@@ -293,7 +296,11 @@ impl Spec {
                     BreadthLine::Wale => (),
                     BreadthLine::ButOut(breadth) => {
                         if let Some(height) = row[i] {
-                            points.push(point(position, breadth, height));
+                            points.push(P3::new(
+                                position.into(),
+                                breadth.into(),
+                                height.into(),
+                            ));
                         }
                     }
                 }
@@ -302,14 +309,20 @@ impl Spec {
                 match *height {
                     HeightLine::Sheer => (),
                     HeightLine::WLUp(height) => if let Some(breadth) = row[i] {
-                        points.push(point(position, breadth, height));
+                        points.push(P3::new(
+                            position.into(),
+                            breadth.into(),
+                            height.into(),
+                        ));
                     },
                 }
             }
             // TODO: diagonals
             // The points are out of order, and may contain duplicates.
             // Sort them and remove the duplicates.
+            println!("BEFORE SORT: {:?}", points);
             let points = sort_and_remove_duplicates(points);
+            println!("AFTER SORT: {:?}", points);
             // Construct the station (cross section).
             let station = Station {
                 points: points.clone(),
@@ -323,7 +336,7 @@ impl Spec {
             breadths: self.get_breadths(),
             heights: self.get_heights(),
             num_planks: self.config.number_of_planks,
-            overlap: self.config.plank_overlap()?,
+            overlap: self.config.plank_overlap()?.into(),
             plank_resolution: self.config.plank_resolution,
         })
     }
@@ -335,7 +348,7 @@ impl Spec {
                 BreadthLine::Sheer => (),
                 BreadthLine::Wale => (),
                 BreadthLine::ButOut(breadth) => {
-                    stored_breadths.push(breadth as f32)
+                    stored_breadths.push(breadth.into())
                 }
             }
         }
@@ -347,7 +360,7 @@ impl Spec {
         for &(ref height, _) in &self.data.breadths {
             match *height {
                 HeightLine::Sheer => (),
-                HeightLine::WLUp(height) => stored_heights.push(height as f32),
+                HeightLine::WLUp(height) => stored_heights.push(height.into()),
             }
         }
         stored_heights
@@ -366,10 +379,6 @@ fn sort_and_remove_duplicates(mut points: Vec<P3>) -> Vec<P3> {
         prev_point = point;
     }
     good_points
-}
-
-fn point(x: usize, y: usize, z: usize) -> P3 {
-    P3::new(x as f32, y as f32, z as f32)
 }
 
 fn reflect2(axis: Axis, points: &[P2]) -> Vec<P2> {
@@ -393,4 +402,3 @@ fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
         })
         .collect()
 }
-

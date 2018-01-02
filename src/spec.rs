@@ -22,7 +22,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn plank_overlap(&self) -> Result<usize, Error> {
+    pub fn plank_overlap(&self) -> Result<f32, Error> {
         Ok(Feet::parse(&self.plank_overlap)?.into())
     }
 }
@@ -33,7 +33,7 @@ pub struct Data {
     /// The names of the stations (cross sections of the hull).
     pub stations: Vec<String>,
     /// The locations of each of the stations.
-    pub positions: Vec<usize>,
+    pub positions: Vec<Feet>,
     /// For each station,
     /// the height above base
     /// at each half-breadth from center.
@@ -48,19 +48,19 @@ pub struct Data {
 }
 
 /// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
-pub type DataRow<T> = (T, Vec<Option<usize>>);
+pub type DataRow<T> = (T, Vec<Option<Feet>>);
 
 #[derive(Debug, Clone, Copy)]
 pub enum BreadthLine {
     Sheer,
     Wale,
-    ButOut(usize),
+    ButOut(Feet),
 }
 
 #[derive(Debug, Clone, Copy)]
 pub enum HeightLine {
     Sheer,
-    WLUp(usize),
+    WLUp(Feet),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -73,7 +73,7 @@ impl Spec {
     pub fn get_sheer_breadth(
         &self,
         station_index: usize,
-    ) -> Result<usize, Error> {
+    ) -> Result<Feet, Error> {
         for &(ref height, ref row) in &self.data.breadths {
             match *height {
                 HeightLine::Sheer => match row[station_index] {
@@ -89,7 +89,7 @@ impl Spec {
     pub fn get_sheer_height(
         &self,
         station_index: usize,
-    ) -> Result<usize, Error> {
+    ) -> Result<Feet, Error> {
         for &(ref breadth, ref row) in &self.data.heights {
             match *breadth {
                 BreadthLine::Sheer => match row[station_index] {

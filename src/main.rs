@@ -30,7 +30,7 @@ use failure::Error;
 use spec::Spec;
 use hull::FlattenedPlank;
 use render_2d::SvgDoc;
-use render_3d::{PathStyle3, ScadPath};
+use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use scad_dots::core::Tree;
 use scad_dots::harness::preview_model;
 
@@ -65,16 +65,16 @@ fn run() -> Result<(), Error> {
 
     for plank in &planks[0..1] {
         tops.push(ScadPath::new(plank.top_line.sample())
-            .stroke(15.)
+            .stroke(SCAD_STROKE)
             .link(PathStyle3::Line)?);
         bottoms.push(ScadPath::new(plank.bottom_line.sample())
-            .stroke(5.)
+            .stroke(SCAD_STROKE)
             .link(PathStyle3::Line)?);
     }
 
     for plank in &planks {
         dots.push(ScadPath::new(plank.outline())
-            .stroke(15.)
+            .stroke(SCAD_STROKE)
             .link(PathStyle3::Dots)?);
     }
 
