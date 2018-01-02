@@ -106,8 +106,8 @@ impl Plank {
         if top_pts.len() != bot_pts.len() {
             panic!(concat!(
                 "Plank unexpectedly has different number ",
-                "of top and bottom points."
-            ));
+                "of top and bottom points. {} {}"),
+                   top_pts.len(), bot_pts.len());
         }
         let n = top_pts.len();
         for i in 0..n - 1 {
@@ -176,15 +176,14 @@ impl Hull {
     /// Get a line across the hull that is a constant fraction `f`
     /// of the distance along the edge of each cross section.
     fn get_line(&self, f: f32, offset: f32) -> Vec<P3> {
-        let pts = self.stations
+        self.stations
             .iter()
             .map(|station| {
                 let len = station.spline.length();
                 let dist = f * len + offset;
                 station.spline.at(dist)
             })
-            .collect();
-        remove_duplicates(pts)
+            .collect()
     }
 
     pub fn draw_height_breadth_grid(&self) -> Vec<SvgPath> {
