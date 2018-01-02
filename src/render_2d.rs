@@ -1,3 +1,13 @@
+/// Example:
+///
+/// ```
+/// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
+///     .style(PathStyle2::LineWithDots)
+///     .stroke(SvgColor::Blue, 2.);
+/// path.save("tests/tmp/bluepath.svg").unwrap();
+/// ```
+///
+
 use scad_dots::utils::{Axis, P2, V2};
 use scad_dots::core::MinMaxCoord;
 
@@ -8,15 +18,7 @@ use svg::node::Value;
 use svg::node::element::{Circle, Group, Path, Rectangle};
 use svg::node::element::path::Data;
 
-/// Example:
-///
-/// ```
-/// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
-///     .style(PathStyle2::LineWithDots)
-///     .stroke(SvgColor::Blue, 2.);
-/// path.save("tests/tmp/bluepath.svg").unwrap();
-/// ```
-///
+const SCALE: f32 = 96.; // pixels per inch
 
 #[derive(Clone, Copy, Debug)]
 pub enum PathStyle2 {
@@ -128,7 +130,7 @@ impl SvgDoc {
 impl SvgPath {
     pub fn new(points: Vec<P2>) -> SvgPath {
         SvgPath {
-            points: points,
+            points: points.into_iter().map(|p| SCALE * p).collect(),
             stroke: Stroke {
                 color: SvgColor::Black,
                 width: 1.,
