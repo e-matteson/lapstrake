@@ -292,8 +292,8 @@ impl Spec {
             // Add the height measurements. Assume they are at the
             // positions given by the sheer for that station.
             for &(ref breadth, ref row) in &data.heights {
-                let posn = self.get_station_position(i, HeightLine::Sheer)?;
                 if let Some(height) = row[i] {
+                    let posn = self.get_station_position(i, HeightLine::Sheer)?;
                     match *breadth {
                         BreadthLine::Sheer => (),
                         BreadthLine::Wale => {
@@ -307,8 +307,8 @@ impl Spec {
             }
             // Add the breadth measurements.
             for &(ref height, ref row) in &data.breadths {
-                let posn = self.get_station_position(i, *height)?;
                 if let Some(breadth) = row[i] {
+                    let posn = self.get_station_position(i, *height)?;
                     match *height {
                         HeightLine::Sheer => (),
                         HeightLine::WLUp(height) => {
@@ -320,9 +320,7 @@ impl Spec {
             // TODO: diagonals
             // The points are out of order, and may contain duplicates.
             // Sort them and remove the duplicates.
-            println!("BEFORE SORT: {:?}", points);
             let points = sort_and_remove_duplicates(points);
-            println!("AFTER SORT: {:?}", points);
             // Construct the station (cross section).
             let station = Station {
                 points: points.clone(),
