@@ -124,7 +124,7 @@ where
 
         let mut row = vec![];
         for csv_cell in csv_row {
-            let cell = Feet::parse_opt(csv_cell)?.map(|x| x.into());
+            let cell = Feet::parse_opt(csv_cell)?;
             row.push(cell);
         }
         table.push((T::from_str(head)?, row));

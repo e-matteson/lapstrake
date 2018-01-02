@@ -8,7 +8,7 @@ Lapstrake is a tool for ship afficionados. It takes a table of offsets
 that describe the shape of a hull, and produces:
 
 - A 3d rendering of the hull.
-- Half-breadth, Buttock, and Waterline diagrams.
+- Half-breadth, Profile, and Waterline drawings.
 - Cross sections of the hull suitable for laser cutting, to make a
   frame for model ship construction.
 - Planks that can be laser cut and then layed out to form the

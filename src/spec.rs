@@ -24,7 +24,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn plank_overlap(&self) -> Result<usize, Error> {
+    pub fn plank_overlap(&self) -> Result<f32, Error> {
         Ok(Feet::parse(&self.plank_overlap)?.into())
     }
 }
@@ -50,19 +50,19 @@ pub struct Data {
 }
 
 /// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
-pub type DataRow<T> = (T, Vec<Option<usize>>);
+pub type DataRow<T> = (T, Vec<Option<Feet>>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreadthLine {
     Sheer,
     Wale,
-    ButOut(usize),
+    ButOut(Feet),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeightLine {
     Sheer,
-    WLUp(usize),
+    WLUp(Feet),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,15 +76,15 @@ impl Spec {
         &self,
         station: usize,
         line: HeightLine,
-    ) -> Result<usize, Error> {
+    ) -> Result<Feet, Error> {
         Spec::lookup(&self.data.positions, station, line)
     }
 
-    pub fn get_sheer_breadth(&self, station: usize) -> Result<usize, Error> {
+    pub fn get_sheer_breadth(&self, station: usize) -> Result<Feet, Error> {
         Spec::lookup(&self.data.breadths, station, HeightLine::Sheer)
     }
 
-    pub fn get_sheer_height(&self, station: usize) -> Result<usize, Error> {
+    pub fn get_sheer_height(&self, station: usize) -> Result<Feet, Error> {
         Spec::lookup(&self.data.heights, station, BreadthLine::Sheer)
     }
 
@@ -92,7 +92,7 @@ impl Spec {
         rows: &Vec<DataRow<M>>,
         station_index: usize,
         measurement: M,
-    ) -> Result<usize, Error>
+    ) -> Result<Feet, Error>
     where
         M: fmt::Debug + cmp::Eq + Copy,
     {

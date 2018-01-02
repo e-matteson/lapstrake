@@ -16,6 +16,8 @@ use scad_dots::utils::{P3, R3};
 /// preview_model(&path.link(PathStyle3::Line)?)?;
 /// ```
 
+pub const SCAD_STROKE: f32 = 0.1;
+
 pub struct ScadPath {
     points: Vec<P3>,
     show_points: bool,
@@ -34,7 +36,7 @@ impl ScadPath {
         ScadPath {
             points: points,
             show_points: false,
-            stroke: 1.,
+            stroke: 0.01,
         }
     }
 

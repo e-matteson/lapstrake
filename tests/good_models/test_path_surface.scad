@@ -7,21 +7,21 @@ union()
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=1);
+				sphere(d=0.01);
 			}
 		}
 		translate([0,10,0])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=1);
+				sphere(d=0.01);
 			}
 		}
 		translate([0,5,-10])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=1);
+				sphere(d=0.01);
 			}
 		}
 	}
@@ -31,21 +31,21 @@ union()
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 		translate([0,10,0])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 		translate([0,5,-10])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 	}

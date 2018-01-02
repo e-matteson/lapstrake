@@ -22,6 +22,7 @@ impl Spline {
     ) -> Result<Spline, Error> {
         let n = ref_points.len();
         if n < 4 {
+            println!("res: {}, ref: {:?}", resolution, ref_points);
             bail!("Splines must have at least 4 points.")
         }
         let mut points = vec![];

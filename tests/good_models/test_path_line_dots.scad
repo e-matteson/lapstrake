@@ -9,14 +9,14 @@ union()
 			{
 				rotate(0,[0,0,1])
 				{
-					sphere(d=1);
+					sphere(d=0.01);
 				}
 			}
 			translate([50,50,0])
 			{
 				rotate(0,[0,0,1])
 				{
-					sphere(d=1);
+					sphere(d=0.01);
 				}
 			}
 		}
@@ -26,14 +26,14 @@ union()
 			{
 				rotate(0,[0,0,1])
 				{
-					sphere(d=1);
+					sphere(d=0.01);
 				}
 			}
 			translate([100,20,75])
 			{
 				rotate(0,[0,0,1])
 				{
-					sphere(d=1);
+					sphere(d=0.01);
 				}
 			}
 		}
@@ -44,21 +44,21 @@ union()
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 		translate([50,50,0])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 		translate([100,20,75])
 		{
 			rotate(0,[0,0,1])
 			{
-				sphere(d=2);
+				sphere(d=0.02);
 			}
 		}
 	}

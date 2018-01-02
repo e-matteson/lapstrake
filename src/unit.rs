@@ -13,6 +13,14 @@ pub struct Feet {
 }
 
 impl Feet {
+    pub fn zero() -> Feet {
+        Feet {
+            feet: 0,
+            inches: 0,
+            eighths: 0,
+        }
+    }
+
     /// Parse Feet from a string, using the format 2-3-4.
     pub fn parse(text: &str) -> Result<Feet, Error> {
         match Feet::parse_opt(text)? {
@@ -45,16 +53,16 @@ impl Feet {
         }
 
         let parts: Vec<&str> = text.split('-').collect();
-        let ctx = concat!(
+        let message = concat!(
             "Was not able to read measurement. ",
             "Expected formatting like 3-4-5 for 3' 4 5/8\"."
         );
 
         match parts.as_slice() {
             &[feet, inches, eighths] => Ok(Some(Feet {
-                feet: parse_usize(&feet).context(ctx)?,
-                inches: parse_usize(&inches).context(ctx)?,
-                eighths: parse_usize(&eighths).context(ctx)?,
+                feet: parse_usize(&feet).context(message)?,
+                inches: parse_usize(&inches).context(message)?,
+                eighths: parse_usize(&eighths).context(message)?,
             })),
             _ => bail!(
                 concat!(
@@ -69,22 +77,22 @@ impl Feet {
     }
 }
 
-impl Into<usize> for Feet {
-    fn into(self) -> usize {
-        self.feet as usize * 12 * 8 + self.inches as usize * 8
-            + self.eighths as usize
+impl Into<f32> for Feet {
+    fn into(self) -> f32 {
+        (self.feet as f32) + (self.inches as f32 / 12.)
+            + (self.eighths as f32 / 12. / 8.)
     }
 }
 
-impl Into<Feet> for usize {
-    fn into(self) -> Feet {
-        Feet {
-            feet: ((self / 8) / 12) as u32,
-            inches: ((self / 8) % 12) as u32,
-            eighths: (self % 8) as u32,
-        }
-    }
-}
+// impl Into<Feet> for usize {
+//     fn into(self) -> Feet {
+//         Feet {
+//             feet: ((self / 8) / 12) as u32,
+//             inches: ((self / 8) % 12) as u32,
+//             eighths: (self % 8) as u32,
+//         }
+//     }
+// }
 
 impl fmt::Debug for Feet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -117,12 +125,6 @@ mod tests {
             inches: 3,
             eighths: 4,
         };
-
-        // Conversion to/from usize
-        let x_usize: usize = x.into();
-        assert_eq!(x_usize, 220);
-        let x_feet: Feet = x_usize.into();
-        assert_eq!(x_feet, x);
 
         // Parsing
         assert_eq!(Feet::parse("2-3-4").unwrap(), x);
