@@ -194,7 +194,7 @@ impl Hull {
             .iter()
             .map(|station| station.at(f, offset))
             .collect();
-        Spline::new(points, 1)
+        Spline::new(points, self.plank_resolution)
     }
 
     // Get a position on the station that is a constant fraction `f`
