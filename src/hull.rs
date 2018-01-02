@@ -104,10 +104,14 @@ impl Plank {
         let left_len = distance(&top_pts[0], &bot_pts[0]);
         let mut quads = vec![];
         if top_pts.len() != bot_pts.len() {
-            panic!(concat!(
-                "Plank unexpectedly has different number ",
-                "of top and bottom points. {} {}"),
-                   top_pts.len(), bot_pts.len());
+            panic!(
+                concat!(
+                    "Plank unexpectedly has different number ",
+                    "of top and bottom points. {} {}"
+                ),
+                top_pts.len(),
+                bot_pts.len()
+            );
         }
         let n = top_pts.len();
         for i in 0..n - 1 {

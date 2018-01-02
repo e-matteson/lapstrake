@@ -10,23 +10,9 @@ use unit::*;
 /// The spec for the hull of a ship, plus configuration options.
 #[derive(Debug)]
 pub struct Spec {
-    pub config: Config,
     pub data: Data,
-}
-
-/// Configuration options.
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    pub station_resolution: usize,
-    pub plank_resolution: usize,
-    pub number_of_planks: usize,
-    plank_overlap: String,
-}
-
-impl Config {
-    pub fn plank_overlap(&self) -> Result<f32, Error> {
-        Ok(Feet::parse(&self.plank_overlap)?.into())
-    }
+    pub planks: Planks,
+    pub config: Config,
 }
 
 /// A standard set of reference points for the hull shape.
@@ -51,6 +37,41 @@ pub struct Data {
 
 /// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
 pub type DataRow<T> = (T, Vec<Option<Feet>>);
+
+/// Where planks should lie on the hull.
+#[derive(Debug)]
+pub struct Planks {
+    pub stations: Vec<PlankStation>,
+    pub planks_locations: Vec<PlankRow>,
+}
+
+/// For a given plank, specifies where that plank should lie (as a
+/// fraction between 0 for the bottom to 1 at the top) at each station
+/// or fore-aft position.
+pub type PlankRow = Vec<Option<f32>>;
+
+/// A plank's location can be specified either along an existing
+/// station, or along a cross-section of constant fore-aft position.
+#[derive(Debug)]
+pub enum PlankStation {
+    Station(String),
+    Position(Feet),
+}
+
+/// Configuration options.
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub station_resolution: usize,
+    pub plank_resolution: usize,
+    pub number_of_planks: usize,
+    plank_overlap: String,
+}
+
+impl Config {
+    pub fn plank_overlap(&self) -> Result<f32, Error> {
+        Ok(Feet::parse(&self.plank_overlap)?.into())
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreadthLine {

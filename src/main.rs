@@ -24,9 +24,10 @@ mod render_3d;
 mod render_2d;
 
 use std::path::Path;
-use load::{read_config, read_data};
+use load::{read_config, read_data, read_planks};
 use failure::Error;
 
+use util::print_error;
 use spec::Spec;
 use hull::FlattenedPlank;
 use render_2d::SvgDoc;
@@ -43,11 +44,13 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let config = read_config(Path::new("config.csv"))?;
     let data = read_data(Path::new("data.csv"))?;
+    let planks = read_planks(Path::new("planks.csv"))?;
+    let config = read_config(Path::new("config.csv"))?;
     let spec = Spec {
-        config: config,
         data: data,
+        planks: planks,
+        config: config,
     };
     let hull = spec.get_hull()?;
 
@@ -77,14 +80,14 @@ fn run() -> Result<(), Error> {
             .stroke(SCAD_STROKE)
             .link(PathStyle3::Dots)?);
     }
-
+    /*
     preview_model(&union![
         Tree::Union(dots),
         Tree::Union(tops),
         Tree::Union(bottoms),
         hull.render_stations()?,
     ])?;
-
+*/
     let flattened_planks: Result<Vec<FlattenedPlank>, Error> =
         planks.iter().map(|plank| plank.flatten()).collect();
 
@@ -95,14 +98,4 @@ fn run() -> Result<(), Error> {
     doc.save("images/plank.svg")?;
 
     Ok(())
-}
-
-fn print_error(error: Error) {
-    let mut causes = error.causes();
-    if let Some(first) = causes.next() {
-        println!("\nError: {}", first);
-    }
-    for cause in causes {
-        println!("Cause: {}", cause);
-    }
 }

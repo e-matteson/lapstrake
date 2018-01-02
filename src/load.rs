@@ -4,6 +4,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::iter;
 use std::io;
+use std::fs;
 
 use csv;
 use failure::{Error, ResultExt};
@@ -14,17 +15,59 @@ use spec::*;
 /// Read the data file, which contains reference points along cross
 /// sections of the hull.
 pub fn read_data(path: &Path) -> Result<Data, Error> {
-    let reader = csv::Reader::from_path(path)
-        .context(format!("Could not read file {:?}.", path))?;
+    let reader = open_csv_file(path)?;
     Ok(read_data_from_csv(reader)
         .context(format!("Could not parse file {:?}.", path))?)
 }
 
+/// Read the plank file, which says where planks should be placed on the hull.
+pub fn read_planks(path: &Path) -> Result<Planks, Error> {
+    let reader = open_csv_file(path)?;
+    Ok(read_planks_from_csv(reader)
+        .context(format!("Could not parse file {:?}.", path))?)
+}
+
+/// Read the configuration file.
 pub fn read_config(path: &Path) -> Result<Config, Error> {
-    let reader = csv::Reader::from_path(path)
-        .context(format!("Could not read file {:?}.", path))?;
+    let reader = open_csv_file(path)?;
     Ok(read_config_from_csv(reader)
         .context(format!("Could not parse file {:?}.", path))?)
+}
+
+fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, Error> {
+    Ok(csv::Reader::from_path(path)
+        .context(format!("Could not read file {:?}.", path))?)
+}
+
+fn read_planks_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Planks, Error>
+where
+    T: io::Read,
+{
+    println!("Parsing planks file.");
+    let mut stations = vec![];
+    {
+        let headers = csv.headers();
+        let headers = headers.expect("Could not read stations.");
+        let headers = headers.iter().skip(1);
+        for header in headers {
+            stations.push(read_plank_station(header));
+        }
+    }
+
+    // Read plank curve fractions
+    let mut planks = vec![];
+    for row in csv.records() {
+        let row = row?;
+        let mut plank = vec![];
+        for cell in row.iter().skip(1) {
+            plank.push(read_plank_curve_fraction(cell)?);
+        }
+        planks.push(plank);
+    }
+    Ok(Planks {
+        stations: stations,
+        planks_locations: planks,
+    })
 }
 
 fn read_config_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Config, Error>
@@ -159,6 +202,32 @@ where
             }
         }
         None => Ok(None),
+    }
+}
+
+fn read_plank_curve_fraction(text: &str) -> Result<Option<f32>, Error> {
+    if text == "x" {
+        Ok(None)
+    } else {
+        let frac = f32::from_str(text)?;
+        if frac >= 0.0 && frac <= 1.0 {
+            Ok(Some(frac))
+        } else {
+            bail!(
+                concat!(
+                    "Plank location fractions must be between 0 ",
+                    "and 1. Read fraction {}."
+                ),
+                frac
+            )
+        }
+    }
+}
+
+fn read_plank_station(text: &str) -> PlankStation {
+    match Feet::parse(text) {
+        Ok(feet) => PlankStation::Position(feet),
+        Err(_) => PlankStation::Station(text.to_string()),
     }
 }
 
