@@ -89,6 +89,19 @@ impl Spline {
         }
         panic!("Fell off the end of a spline.");
     }
+
+    // Get the point at a given x coordinate (a.k.a. position).
+    pub fn at_x(&self, desired_x: f32) -> Result<P3, Error> {
+        let i = match self.points
+            .binary_search_by(|pt| pt.x.partial_cmp(&desired_x).unwrap())
+        {
+            Ok(i) => i,
+            Err(i) => i,
+        };
+        Ok(*self.points
+            .get(i)
+            .expect(&format!("Could not get point at position {}", desired_x)))
+    }
 }
 
 fn linear_interpolate(t: f32, pt1: P3, pt2: P3) -> P3 {

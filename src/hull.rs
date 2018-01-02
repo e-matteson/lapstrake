@@ -23,6 +23,7 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] planks: Planks,
     #[min_max_coord(ignore)] overlap: f32,
+    #[min_max_coord(ignore)] station_resolution: usize,
     #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
 }
@@ -188,15 +189,12 @@ impl Hull {
 
     /// Get a line across the hull that is a constant fraction `f`
     /// of the distance along the edge of each cross section.
-    fn get_line(&self, f: f32, offset: f32) -> Vec<P3> {
-        self.stations
+    fn get_line(&self, f: f32, offset: f32) -> Result<Spline, Error> {
+        let points = self.stations
             .iter()
-            .map(|station| {
-                let len = station.spline.length();
-                let dist = f * len + offset;
-                station.spline.at(dist)
-            })
-            .collect()
+            .map(|station| station.at(f, offset))
+            .collect();
+        Spline::new(points, 1)
     }
 
     // Get a position on the station that is a constant fraction `f`
@@ -220,15 +218,25 @@ impl Hull {
     ) -> Result<P3, Error> {
         match station {
             &PlankStation::Station(ref station_name) => {
-                let station = self.get_station(station_name)?;
-                let len = station.spline.length();
-                let dist = f * len + offset;
-                Ok(station.spline.at(dist))
+                Ok(self.get_station(station_name)?.at(f, offset))
             }
             &PlankStation::Position(posn) => {
-                unimplemented!();
+                Ok(self.hallucinate_station(posn)?.at(f, offset))
             }
         }
+    }
+
+    pub fn hallucinate_station(&self, posn: Feet) -> Result<Station, Error> {
+        let mut points = vec![];
+        let resolution = 10;
+        for i in 0..resolution + 1 {
+            let f = i as f32 / resolution as f32;
+            let line = self.get_line(f, 0.0)?;
+            points.push(line.at_x(posn.into())?);
+        }
+        let name = format!("{}", posn);
+        let resolution = self.station_resolution;
+        Station::new(name, points, resolution)
     }
 
     pub fn draw_height_breadth_grid(&self) -> Vec<SvgPath> {
@@ -300,6 +308,18 @@ impl Hull {
 }
 
 impl Station {
+    pub fn new(
+        name: String,
+        points: Vec<P3>,
+        resolution: usize,
+    ) -> Result<Station, Error> {
+        Ok(Station {
+            name: name,
+            points: points.clone(),
+            spline: Spline::new(points, resolution)?,
+        })
+    }
+
     pub fn render_3d(&self) -> Result<Tree, Error> {
         let path = ScadPath::new(self.points.clone())
             .stroke(SCAD_STROKE)
@@ -318,6 +338,14 @@ impl Station {
         SvgPath::new(project_points(Axis::X, &self.points))
             .stroke(SvgColor::Green, 2.0)
             .style(PathStyle2::Dots)
+    }
+
+    /// Get a point along the curve of this station a fraction `f` of
+    /// the way along the curve, plus `offset`.
+    pub fn at(&self, f: f32, offset: f32) -> P3 {
+        let len = self.spline.length();
+        let dist = f * len + offset;
+        self.spline.at(dist)
     }
 }
 
@@ -368,12 +396,11 @@ impl Spec {
             points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
             let points = remove_duplicates(points);
             // Construct the station (cross section).
-            let station = Station {
-                name: data.stations[i].to_string(),
-                points: points.clone(),
-                spline: Spline::new(points, resolution)?,
-            };
-            stations.push(station);
+            stations.push(Station::new(
+                data.stations[i].to_string(),
+                points,
+                resolution,
+            )?);
         }
 
         Ok(Hull {
@@ -384,6 +411,7 @@ impl Spec {
             planks: self.planks.clone(),
             overlap: self.config.plank_overlap()?.into(),
             plank_resolution: self.config.plank_resolution,
+            station_resolution: self.config.station_resolution,
         })
     }
 
