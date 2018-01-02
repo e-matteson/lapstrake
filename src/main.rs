@@ -29,11 +29,11 @@ use failure::Error;
 
 use util::print_error;
 use spec::Spec;
-use hull::FlattenedPlank;
+// use hull::FlattenedPlank;
 use render_2d::SvgDoc;
-use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
-use scad_dots::core::Tree;
-use scad_dots::harness::preview_model;
+// use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
+// use scad_dots::core::Tree;
+// use scad_dots::harness::preview_model;
 
 fn main() {
     if let Err(e) = run() {
@@ -59,43 +59,9 @@ fn run() -> Result<(), Error> {
     doc.append_paths(hull.draw_half_breadths());
     doc.save("images/half-breadth.svg")?;
 
-    // Show all planks overlayed on each other
-    let planks = hull.get_planks()?;
-
-    let mut tops = Vec::new();
-    let mut bottoms = Vec::new();
-    let mut dots = Vec::new();
-
-    for plank in &planks[0..1] {
-        tops.push(ScadPath::new(plank.top_line.sample())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Line)?);
-        bottoms.push(ScadPath::new(plank.bottom_line.sample())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Line)?);
-    }
-
-    for plank in &planks {
-        dots.push(ScadPath::new(plank.outline())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Dots)?);
-    }
-    /*
-    preview_model(&union![
-        Tree::Union(dots),
-        Tree::Union(tops),
-        Tree::Union(bottoms),
-        hull.render_stations()?,
-    ])?;
-*/
-    let flattened_planks: Result<Vec<FlattenedPlank>, Error> =
-        planks.iter().map(|plank| plank.flatten()).collect();
-
-    let mut doc = SvgDoc::new();
-    for plank in &flattened_planks? {
-        doc.append_path(plank.render_2d());
-    }
-    doc.save("images/plank.svg")?;
+    // Show the closed cross-sections for each station.
+    hull.draw_cross_sections(&["Stem".into(), "Post".into()])?
+        .save("images/cross-sections.svg")?;
 
     Ok(())
 }
