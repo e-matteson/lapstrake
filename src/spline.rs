@@ -25,8 +25,7 @@ impl Spline {
         let ref_points: Vec<(P3, usize)> = count_multiplicity(ref_points);
         let n = ref_points.len();
         if n < 4 {
-            println!("res: {}, ref: {:?}", resolution, ref_points);
-            bail!("Splines must have at least 4 distinct points.")
+            bail!("Splines must have at least 4 points.")
         }
         let mut points = vec![];
         for i in 0..n - 3 {
@@ -49,16 +48,6 @@ impl Spline {
                 points.extend(repeat(ref_points[i + 3], resolution));
             }
         }
-        /*
-        println!("!!");
-        for pt in &ref_points {
-            println!("{} {} {}", pt.x, pt.y, pt.z);
-        }
-        println!("!!!");
-        for pt in &points {
-            println!("{} {} {}", pt.x, pt.y, pt.z);
-        }
-        */
         Ok(Spline { points: points })
     }
 
