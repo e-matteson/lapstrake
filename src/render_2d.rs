@@ -123,6 +123,7 @@ impl SvgDoc {
     }
 
     pub fn save(self, filename: &str) -> Result<(), Error> {
+        println!("Saving svg file {}.", filename);
         Ok(svg::save(filename, &self.finalize())?)
     }
 }

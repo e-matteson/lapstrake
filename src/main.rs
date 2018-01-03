@@ -28,6 +28,7 @@ use load::{read_config, read_data, read_planks};
 use failure::Error;
 
 use util::print_error;
+use unit::Feet;
 use spec::Spec;
 use hull::FlattenedPlank;
 use render_2d::SvgDoc;
@@ -62,32 +63,11 @@ fn run() -> Result<(), Error> {
     // Show all planks overlayed on each other
     let planks = hull.get_planks()?;
 
-    let mut tops = Vec::new();
-    let mut bottoms = Vec::new();
-    let mut dots = Vec::new();
-
-    for plank in &planks[0..1] {
-        tops.push(ScadPath::new(plank.top_line.sample())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Line)?);
-        bottoms.push(ScadPath::new(plank.bottom_line.sample())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Line)?);
-    }
-
+    let mut plank_renderings = vec![];
     for plank in &planks {
-        dots.push(ScadPath::new(plank.outline())
-            .stroke(SCAD_STROKE)
-            .link(PathStyle3::Dots)?);
+        plank_renderings.push(plank.render_3d()?);
     }
-    /*
-    preview_model(&union![
-        Tree::Union(dots),
-        Tree::Union(tops),
-        Tree::Union(bottoms),
-        hull.render_stations()?,
-    ])?;
-*/
+
     let flattened_planks: Result<Vec<FlattenedPlank>, Error> =
         planks.iter().map(|plank| plank.flatten()).collect();
 
@@ -96,6 +76,14 @@ fn run() -> Result<(), Error> {
         doc.append_path(plank.render_2d());
     }
     doc.save("images/plank.svg")?;
+
+    /*
+    preview_model(&union![
+        Tree::Union(plank_renderings),
+        hull.render_stations()?,
+        hull.render_station_at(Feet::parse("27-4-4")?)?
+    ])?;
+*/
 
     Ok(())
 }

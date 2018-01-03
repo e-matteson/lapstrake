@@ -22,7 +22,6 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] planks: Planks,
-    #[min_max_coord(ignore)] overlap: f32,
     #[min_max_coord(ignore)] station_resolution: usize,
     #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
@@ -40,6 +39,7 @@ pub struct Station {
 pub struct Plank {
     pub top_line: Spline,
     pub bottom_line: Spline,
+    pub resolution: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +70,18 @@ impl FlattenedPlank {
 }
 
 impl Plank {
+    fn new(
+        bot_line: Vec<P3>,
+        top_line: Vec<P3>,
+        resolution: usize,
+    ) -> Result<Plank, Error> {
+        Ok(Plank {
+            resolution: ((bot_line.len() + top_line.len()) / 2) * resolution,
+            bottom_line: Spline::new(bot_line, resolution)?,
+            top_line: Spline::new(top_line, resolution)?,
+        })
+    }
+
     /// A plank is a 3d object. Flatten it out to fit on a piece of paper.
     pub fn flatten(&self) -> Result<FlattenedPlank, Error> {
         let (first_len, quads) = self.quads()?;
@@ -101,8 +113,8 @@ impl Plank {
 
     // Give the "leftmost" edge length, then quads from "left" to "right".
     fn quads(&self) -> Result<(f32, Vec<Quad>), Error> {
-        let top_pts = self.top_line.sample();
-        let bot_pts = self.bottom_line.sample();
+        let top_pts = self.top_line.sample(Some(self.resolution));
+        let bot_pts = self.bottom_line.sample(Some(self.resolution));
         let left_len = distance(&top_pts[0], &bot_pts[0]);
         let mut quads = vec![];
         if top_pts.len() != bot_pts.len() {
@@ -132,10 +144,23 @@ impl Plank {
         }
         Ok((left_len, quads))
     }
-    pub fn outline(&self) -> Vec<P3> {
-        let mut all_points = self.top_line.sample();
-        all_points.extend(&self.bottom_line.sample());
-        all_points
+
+    pub fn render_3d(&self) -> Result<Tree, Error> {
+        // Get the lines (bottom includes edges)
+        let top_line = self.top_line.sample(None);
+        let mut bottom_line = vec![];
+        bottom_line.push(top_line[0]);
+        bottom_line.extend(self.bottom_line.sample(None));
+        bottom_line.push(*top_line.last().unwrap());
+        // render the lines (top is dotted)
+        let dots = ScadPath::new(top_line)
+            .stroke(SCAD_STROKE)
+            .link(PathStyle3::Dots)?;
+        let solid = ScadPath::new(bottom_line)
+            .stroke(SCAD_STROKE)
+            .link(PathStyle3::Line)?;
+        // return the rendering
+        Ok(Tree::Union(vec![dots, solid]))
     }
 }
 
@@ -158,15 +183,18 @@ impl Hull {
     /// Planks are meant to be layed out from the bottom of the ship
     /// to the top; as a result, the bottommost plank has no overlap.
     pub fn get_planks(&self) -> Result<Vec<Plank>, Error> {
-        let n = self.planks.plank_locations.len() - 1;
+        let n = self.planks.plank_locations.len() / 2;
         let mut planks = vec![];
         for i in 0..n {
-            let at_end = i + 1 == n;
+            let i = i * 2;
+            /*
+            let at_end = i == n;
             let offset = if at_end {
                 0.
             } else {
                 self.overlap
             };
+            */
             let bot_locs = &self.planks.plank_locations[i];
             let top_locs = &self.planks.plank_locations[i + 1];
             let mut bot_line = vec![];
@@ -174,25 +202,31 @@ impl Hull {
             for (j, ref station) in self.planks.stations.iter().enumerate() {
                 let bot_f = bot_locs[j];
                 let top_f = top_locs[j];
+
+                if let Some(bot_f) = bot_f {
+                    bot_line.push(self.get_point(bot_f, station)?);
+                }
+                if let Some(top_f) = top_f {
+                    top_line.push(self.get_point(top_f, station)?);
+                }
+                /*
                 if let (Some(bot_f), Some(top_f)) = (bot_f, top_f) {
                     bot_line.push(self.get_point(bot_f, 0.0, station)?);
                     top_line.push(self.get_point(top_f, offset, station)?);
                 }
+*/
             }
-            planks.push(Plank {
-                bottom_line: Spline::new(bot_line, self.plank_resolution)?,
-                top_line: Spline::new(top_line, self.plank_resolution)?,
-            });
+            planks.push(Plank::new(bot_line, top_line, self.plank_resolution)?)
         }
         Ok(planks)
     }
 
-    /// Get a line across the hull that is a constant fraction `f`
+    /// Get a line across the hull that is a constant fraction `t`
     /// of the distance along the edge of each cross section.
-    fn get_line(&self, f: f32, offset: f32) -> Result<Spline, Error> {
+    fn get_line(&self, t: f32) -> Result<Spline, Error> {
         let points = self.stations
             .iter()
-            .map(|station| station.at(f, offset))
+            .map(|station| station.at_t(t))
             .collect();
         Spline::new(points, self.plank_resolution)
     }
@@ -208,20 +242,15 @@ impl Hull {
         bail!("Station {} not found.", station_name);
     }
 
-    // Get a point a fraction `f` of the way along the curve of the
-    // given station (plus offset).
-    fn get_point(
-        &self,
-        f: f32,
-        offset: f32,
-        station: &PlankStation,
-    ) -> Result<P3, Error> {
+    // Get a point a fraction `t` of the way along the curve of the
+    // given station.
+    fn get_point(&self, t: f32, station: &PlankStation) -> Result<P3, Error> {
         match station {
             &PlankStation::Station(ref station_name) => {
-                Ok(self.get_station(station_name)?.at(f, offset))
+                Ok(self.get_station(station_name)?.at_t(t))
             }
             &PlankStation::Position(posn) => {
-                Ok(self.hallucinate_station(posn)?.at(f, offset))
+                Ok(self.hallucinate_station(posn)?.at_t(t))
             }
         }
     }
@@ -230,8 +259,8 @@ impl Hull {
         let mut points = vec![];
         let resolution = 10;
         for i in 0..resolution + 1 {
-            let f = i as f32 / resolution as f32;
-            let line = self.get_line(f, 0.0)?;
+            let t = i as f32 / resolution as f32;
+            let line = self.get_line(t)?;
             points.push(line.at_x(posn.into())?);
         }
         let name = format!("{}", posn);
@@ -275,7 +304,7 @@ impl Hull {
         let mut paths = self.draw_height_breadth_grid();
         let half = (self.stations.len() as f32) / 2.;
         for (i, station) in self.stations.iter().enumerate() {
-            let mut samples: Vec<P3> = station.spline.sample();
+            let mut samples: Vec<P3> = station.spline.sample(None);
             let mut points: Vec<P3> = station.points.clone();
             if (i as f32) >= half {
                 samples = reflect3(Axis::Y, &samples);
@@ -293,6 +322,14 @@ impl Hull {
             );
         }
         paths
+    }
+
+    pub fn render_station_at(&self, posn: Feet) -> Result<Tree, Error> {
+        let station = self.hallucinate_station(posn)?;
+        Ok(ScadPath::new(station.points.clone())
+            .stroke(0.1)
+            .show_points()
+            .link(PathStyle3::Line)?)
     }
 
     pub fn render_stations(&self) -> Result<Tree, Error> {
@@ -329,7 +366,7 @@ impl Station {
     }
 
     pub fn render_spline_2d(&self) -> SvgPath {
-        SvgPath::new(project_points(Axis::X, &self.spline.sample()))
+        SvgPath::new(project_points(Axis::X, &self.spline.sample(None)))
             .stroke(SvgColor::Black, 2.0)
             .style(PathStyle2::Line)
     }
@@ -340,12 +377,10 @@ impl Station {
             .style(PathStyle2::Dots)
     }
 
-    /// Get a point along the curve of this station a fraction `f` of
-    /// the way along the curve, plus `offset`.
-    pub fn at(&self, f: f32, offset: f32) -> P3 {
-        let len = self.spline.length();
-        let dist = f * len + offset;
-        self.spline.at(dist)
+    /// Get a point along the curve of this station a fraction `t` of
+    /// the way along the curve.
+    pub fn at_t(&self, t: f32) -> P3 {
+        self.spline.at_t(t)
     }
 }
 
@@ -409,7 +444,6 @@ impl Spec {
             heights: self.get_heights(),
             wale: wale,
             planks: self.planks.clone(),
-            overlap: self.config.plank_overlap()?.into(),
             plank_resolution: self.config.plank_resolution,
             station_resolution: self.config.station_resolution,
         })
