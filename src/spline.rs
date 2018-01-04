@@ -4,6 +4,7 @@
 
 use std::iter;
 
+use util::practically_zero;
 use scad_dots::utils::{distance, Axis, P3};
 use failure::Error;
 
@@ -90,8 +91,12 @@ impl Spline {
             if length + delta >= desired_length {
                 // We are between prev_point and point. Linearly interpolate.
                 // The projection throws this off a bit, but it shouldn't matter.
-                let t = (desired_length - length) / delta;
-                return linear_interpolate(t, prev_point, point);
+                if practically_zero(delta) {
+                    return prev_point;
+                } else {
+                    let t = (desired_length - length) / delta;
+                    return linear_interpolate(t, prev_point, point);
+                }
             } else {
                 length += delta;
                 prev_point = point;

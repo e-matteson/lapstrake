@@ -43,7 +43,7 @@ fn extend_path(path: &Path, ext: &str) -> PathBuf {
 }
 
 fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, Error> {
-    println!("Opening file {:?}.", path);
+    println!("Loading file {:?}.", path);
     Ok(csv::Reader::from_path(&path)
         .context(format!("Could not read file {:?}.", path))?)
 }

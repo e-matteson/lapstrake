@@ -1,6 +1,10 @@
 use failure::Error;
 use scad_dots::utils::{Axis, P2, P3};
 
+pub fn practically_zero(x: f32) -> bool {
+    f32::abs(x) < 0.00000001
+}
+
 pub fn project_points(axis: Axis, points: &[P3]) -> Vec<P2> {
     points.iter().map(|&p| project(axis, p)).collect()
 }

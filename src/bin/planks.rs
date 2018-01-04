@@ -12,7 +12,6 @@ fn main() {
         // Render the flattened planks to an svg.
         let mut doc = SvgDoc::new();
         for plank in &hull.get_flattened_planks()? {
-            println!("  plank");
             doc.append_path(plank.render_2d());
         }
         doc.save("images/plank.svg")?;

@@ -1,8 +1,9 @@
 use nalgebra::{normalize, Rotation2};
-use scad_dots::utils::{Axis, P2, P3};
+use scad_dots::utils::{Axis, P2, P3, V2};
 use scad_dots::core::{MinMaxCoord, Tree};
 use failure::Error;
 
+use util::practically_zero;
 use unit::Feet;
 use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
@@ -42,7 +43,7 @@ pub struct Plank {
     pub resolution: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, MinMaxCoord)]
 pub struct FlattenedPlank {
     pub top_line: Vec<P2>,
     pub bottom_line: Vec<P2>,
@@ -66,6 +67,22 @@ impl FlattenedPlank {
         points.extend(bottom_line);
         points.push(self.top_line[0]);
         points
+    }
+
+    fn orient_horizontally(&mut self) {
+        let left = self.top_line[0];
+        let right = self.top_line[self.top_line.len() - 1];
+        let angle =
+            Rotation2::rotation_between(&(right - left), &V2::new(1.0, 0.0));
+        for pt in self.top_line.iter_mut().chain(self.bottom_line.iter_mut()) {
+            *pt = left + angle * (*pt - left);
+        }
+    }
+
+    fn shift_up(&mut self, dist: f32) {
+        for pt in self.top_line.iter_mut().chain(self.bottom_line.iter_mut()) {
+            pt.y += dist;
+        }
     }
 }
 
@@ -95,7 +112,7 @@ impl Plank {
         // Add each triangle successively.
         for &(a, b, c, d) in &triangles {
             let new_top_pt = triangulate(top_pt, bot_pt, a, b);
-            let new_bot_pt = triangulate(top_pt, bot_pt, c, d);
+            let new_bot_pt = triangulate(new_top_pt, bot_pt, c, d);
             top_line.push(new_top_pt);
             bottom_line.push(new_bot_pt);
             top_pt = new_top_pt;
@@ -128,11 +145,10 @@ impl Plank {
             triangles.push((
                 distance(&top_pts[i], &top_pts[i + 1]),
                 distance(&bot_pts[i], &top_pts[i + 1]),
-                distance(&top_pts[i], &bot_pts[i + 1]),
+                distance(&top_pts[i + 1], &bot_pts[i + 1]),
                 distance(&bot_pts[i], &bot_pts[i + 1]),
             ));
         }
-        println!("len {}\ntriangles:\n{:?}", left_len, triangles);
         Ok((left_len, triangles))
     }
 
@@ -191,8 +207,23 @@ impl Hull {
 
     /// Get planks flattened to 2d.
     pub fn get_flattened_planks(&self) -> Result<Vec<FlattenedPlank>, Error> {
-        let planks = self.get_planks()?;
-        planks.iter().map(|plank| plank.flatten()).collect()
+        let flattened_planks = self.get_planks()?
+            .into_iter()
+            .map(|plank| plank.flatten())
+            .collect::<Result<Vec<FlattenedPlank>, Error>>()?;
+        let flattened_planks = flattened_planks.into_iter();
+        let mut layed_planks = vec![];
+        let mut last_y = None;
+        for mut plank in flattened_planks {
+            plank.orient_horizontally();
+            if let Some(last_y) = last_y {
+                let y = plank.min_coord(Axis::Y);
+                plank.shift_up(last_y - y + 2.0 * EQUALITY_THRESHOLD);
+            }
+            last_y = Some(plank.max_coord(Axis::Y));
+            layed_planks.push(plank);
+        }
+        Ok(layed_planks)
     }
 
     /// Get a line across the hull that is a constant fraction `t`
@@ -488,16 +519,25 @@ fn point(x: Feet, y: Feet, z: Feet) -> P3 {
     P3::new(x.into(), y.into(), z.into())
 }
 
-/// Given two points and two edge lengths, find a third point that
-/// makes a triangle with those two points and those two edge lengths.
+/// Given two points and two edge lengths (and another number, for
+/// horrifying edge cases), find a third point that makes a triangle
+/// with those two points and those two edge lengths.
 fn triangulate(pt1: P2, pt2: P2, x: f32, y: f32) -> P2 {
     // Use law of cosines.
     //    yy = ll + xx -2lx*cos(pt1_angle)
     // -> pt1_angle = acos((ll + xx - yy) / 2lx)
     let l = distance(&pt1, &pt2);
-    let pt1_angle =
-        Rotation2::new(f32::acos((l * l + x * x - y * y) / (2.0 * l * x)));
-    pt1 + x * (pt1_angle * normalize(&(pt2 - pt1)))
+    if practically_zero(10.0 * l) {
+        pt1 + V2::new(-x, 0.0)
+    } else if practically_zero(x) {
+        let pt2_angle =
+            Rotation2::new(-f32::acos((l * l + y * y - x * x) / (2.0 * l * y)));
+        pt2 + y * (pt2_angle * normalize(&(pt1 - pt2)))
+    } else {
+        let pt1_angle =
+            Rotation2::new(f32::acos((l * l + x * x - y * y) / (2.0 * l * x)));
+        pt1 + x * (pt1_angle * normalize(&(pt2 - pt1)))
+    }
 }
 
 #[test]
