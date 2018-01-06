@@ -14,6 +14,9 @@ fn main() {
         let mut doc = SvgDoc::new();
         doc.append_paths(hull.draw_half_breadths());
         doc.save("images/half-breadth.svg")?;
+
+        // Show cross-section templates
+        hull.draw_cross_sections(&["Stem".into(), "Post".into()])?.save("images/cross-sections.svg")?;
         Ok(())
     })
 }

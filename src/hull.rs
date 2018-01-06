@@ -365,51 +365,45 @@ impl Hull {
             // instead.
             let mut holes = SvgGroup::new();
             for &pos in &hole_positions {
-                let hole = SvgCircle::new(pos, HOLE_DIAMETER/2.)
+                let hole = SvgCircle::new(pos, HOLE_DIAMETER / 2.)
                     .stroke(SvgColor::Black, STROKE);
                 if !intersection.contains(&hole.bound()) {
                     bail!("hole doesn't fit in overlap between cross-sections");
                 }
-                holes.append_node(
-                    hole.finalize()
-                )
+                holes.append_node(hole.finalize())
             }
             Ok(holes)
         };
 
-        let mut doc = SvgDoc::new();
-        let cols = (paths.len() as f32).sqrt() as usize;
+        let mut groups = Vec::new();
+        for (_name, mut path) in paths {
+            // Add tab to each cross-section, for mounting it into a jig
+            // let mut path = path.to_owned();
+            let tab_length = V2::new(0.75 * path.bound().width(), 0.);
+            let tab_center = P2::new(path.bound().center().x, 1.2 * max_y);
+            path.append(vec![
+                tab_center - tab_length / 2.,
+                tab_center + tab_length / 2.,
+            ]);
 
-        let mut col_bound = Bound::new();
-        for col in paths.chunks(cols) {
-            for &(ref _name, ref path) in col {
-                // Add tab to each cross-section, for mounting it into a jig
-                let mut path = path.to_owned();
-                let tab_length = V2::new(0.75 * path.bound().width(), 0.);
-                let tab_center = P2::new(path.bound().center().x, 1.2 * max_y);
-                path.append(vec![tab_center - tab_length /2., tab_center + tab_length /2.]);
+            // // TODO Add text label with name of cross-section
+            // let label = SvgText {
+            //     lines: vec![name.into()],
+            //     pos: path.bound().center(),
+            //     color: SvgColor::Black,
+            //     size: 0.2,
+            // }
 
-                // // TODO Add text label with name of cross-section
-                // let label = SvgText {
-                //     lines: vec![name.into()],
-                //     pos: path.bound().center(),
-                //     color: SvgColor::Black,
-                //     size: 0.2,
-                // }
+            let mut group = SvgGroup::new();
+            group.append_path(path.to_owned());
 
-                let mut group = SvgGroup::new();
-                group.append_path(path.to_owned());
-
-                // Translate into grid
-                group.translate_to(col_bound.relative_pos(0., 1.1));
-                let holes = make_holes()?;
-                group.append_group(holes);
-                // TODO letters
-                col_bound = col_bound.union(group.bound());
-                doc.append_group(group);
-            }
-            col_bound = Bound::empty_at(col_bound.relative_pos(1.1, 0.));
+            let holes = make_holes()?;
+            group.append_group(holes);
+            // TODO letters
+            groups.push(group);
         }
+        let mut doc = SvgDoc::new();
+        doc.append_group(SvgGroup::new_grid(groups, 1.1));
         Ok(doc)
     }
 

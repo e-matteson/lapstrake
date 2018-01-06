@@ -58,7 +58,7 @@ pub struct SvgRect {
     fillet: Option<V2>,
 }
 
-// #[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SvgGroup {
     group: Group,
     pub bound: Bound,
@@ -126,11 +126,6 @@ impl SvgDoc {
             self.append_path(path);
         }
     }
-
-    // pub fn set_bound(&mut self, bound: Bound) {
-    //     // If you've only used append_path, you won't need to set the bound explicitly
-    //     self.bound = bound;
-    // }
 
     pub fn bound(&self) -> Bound {
         self.contents.bound
@@ -340,37 +335,37 @@ impl SvgRect {
         }
     }
 
-    // pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
-    //     self.stroke = Some(Stroke {
-    //         color: color,
-    //         width: width,
-    //     });
-    //     self
-    // }
+    pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
+        self.stroke = Some(Stroke {
+            color: color,
+            width: width,
+        });
+        self
+    }
 
     pub fn fill(mut self, fill: SvgColor) -> Self {
         self.fill = Some(fill);
         self
     }
 
-    // pub fn fillet(mut self, radius: f32) -> Self {
-    //     let radius = radius * SCALE;
-    //     assert!(radius >= 0.);
-    //     self.fillet = Some(V2::new(radius, radius));
-    //     self
-    // }
+    pub fn fillet(mut self, radius: f32) -> Self {
+        let radius = radius * SCALE;
+        assert!(radius >= 0.);
+        self.fillet = Some(V2::new(radius, radius));
+        self
+    }
 
-    // pub fn center(&self) -> P2 {
-    //     self.pos + self.size / 2.
-    // }
+    pub fn center(&self) -> P2 {
+        self.pos + self.size / 2.
+    }
 
-    // pub fn scale(mut self, factor: f32) -> Self {
-    //     // Scale the switch uniformly around its center
-    //     let center = self.center();
-    //     self.size *= factor;
-    //     self.pos = center - self.size / 2.;
-    //     self
-    // }
+    pub fn scale(mut self, factor: f32) -> Self {
+        // Scale the switch uniformly around its center
+        let center = self.center();
+        self.size *= factor;
+        self.pos = center - self.size / 2.;
+        self
+    }
 
     pub fn finalize(self) -> Rectangle {
         let mut element = Rectangle::new()
@@ -405,6 +400,26 @@ impl SvgGroup {
             bound: Bound::new(),
             translation: None,
         }
+    }
+
+    pub fn new_grid(contents: Vec<SvgGroup>, spacing_factor: f32) -> SvgGroup {
+        let num_columns = (contents.len() as f32).sqrt() as usize;
+        let mut group = SvgGroup::new();
+        let mut column_bound = Bound::new();
+        // for column in contents.chunks(num_columns) {
+        for (i, mut sub_group) in contents.into_iter().enumerate() {
+            sub_group
+                .translate_to(column_bound.relative_pos(0., spacing_factor));
+            column_bound = column_bound.union(sub_group.bound());
+            group.append_group(sub_group);
+
+            if i % num_columns == num_columns - 1 {
+                column_bound = Bound::empty_at(
+                    column_bound.relative_pos(spacing_factor, 0.),
+                );
+            }
+        }
+        group
     }
 
     pub fn append_path(&mut self, path: SvgPath) {
