@@ -4,6 +4,7 @@
 
 use std::iter;
 
+use util::practically_zero;
 use scad_dots::utils::{distance, Axis, P3};
 use failure::Error;
 
@@ -53,8 +54,18 @@ impl Spline {
 
     /// A sample of points along the spline, at the resolution given
     /// at construction.
-    pub fn sample(&self) -> Vec<P3> {
-        self.points.clone()
+    pub fn sample(&self, resolution: Option<usize>) -> Vec<P3> {
+        match resolution {
+            None => self.points.clone(),
+            Some(resolution) => {
+                let mut points = vec![];
+                for i in 0..resolution + 1 {
+                    let t = i as f32 / resolution as f32;
+                    points.push(self.at_t(t));
+                }
+                points
+            }
+        }
     }
 
     /// The total length of the spline.
@@ -72,7 +83,7 @@ impl Spline {
 
     /// Get the point at a given distance along the curve from the
     /// start of the spline.
-    pub fn at(&self, desired_length: f32) -> P3 {
+    pub fn at_len(&self, desired_length: f32) -> P3 {
         let mut length = 0.0;
         let mut prev_point = self.points[0];
         for &point in &self.points[1..] {
@@ -80,14 +91,24 @@ impl Spline {
             if length + delta >= desired_length {
                 // We are between prev_point and point. Linearly interpolate.
                 // The projection throws this off a bit, but it shouldn't matter.
-                let t = (desired_length - length) / delta;
-                return linear_interpolate(t, prev_point, point);
+                if practically_zero(delta) {
+                    return prev_point;
+                } else {
+                    let t = (desired_length - length) / delta;
+                    return linear_interpolate(t, prev_point, point);
+                }
             } else {
                 length += delta;
                 prev_point = point;
             }
         }
         panic!("Fell off the end of a spline.");
+    }
+
+    // Get the point at a given fraction along the curve.
+    pub fn at_t(&self, t: f32) -> P3 {
+        let len = self.length();
+        self.at_len(t * len)
     }
 
     // Get the point at a given x coordinate (a.k.a. position).

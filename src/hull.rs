@@ -3,10 +3,11 @@ use scad_dots::utils::{Axis, P2, P3, V2};
 use scad_dots::core::{MinMaxCoord, Tree};
 use failure::Error;
 
+use util::practically_zero;
 use unit::Feet;
 use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
-use scad_dots::utils::{distance, rotation_between};
+use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{Bound, PathStyle2, SvgCircle, SvgColor, SvgDoc, SvgGroup,
                 SvgPath};
@@ -25,7 +26,6 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] planks: Planks,
-    #[min_max_coord(ignore)] overlap: f32,
     #[min_max_coord(ignore)] station_resolution: usize,
     #[min_max_coord(ignore)] plank_resolution: usize,
     // TODO: store diagonals for drawing
@@ -43,9 +43,10 @@ pub struct Station {
 pub struct Plank {
     pub top_line: Spline,
     pub bottom_line: Spline,
+    pub resolution: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, MinMaxCoord)]
 pub struct FlattenedPlank {
     pub top_line: Vec<P2>,
     pub bottom_line: Vec<P2>,
@@ -70,12 +71,40 @@ impl FlattenedPlank {
         points.push(self.top_line[0]);
         points
     }
+
+    fn orient_horizontally(&mut self) {
+        let left = self.top_line[0];
+        let right = self.top_line[self.top_line.len() - 1];
+        let angle =
+            Rotation2::rotation_between(&(right - left), &V2::new(1.0, 0.0));
+        for pt in self.top_line.iter_mut().chain(self.bottom_line.iter_mut()) {
+            *pt = left + angle * (*pt - left);
+        }
+    }
+
+    fn shift_up(&mut self, dist: f32) {
+        for pt in self.top_line.iter_mut().chain(self.bottom_line.iter_mut()) {
+            pt.y += dist;
+        }
+    }
 }
 
 impl Plank {
+    fn new(
+        bot_line: Vec<P3>,
+        top_line: Vec<P3>,
+        resolution: usize,
+    ) -> Result<Plank, Error> {
+        Ok(Plank {
+            resolution: ((bot_line.len() + top_line.len()) / 2) * resolution,
+            bottom_line: Spline::new(bot_line, resolution)?,
+            top_line: Spline::new(top_line, resolution)?,
+        })
+    }
+
     /// A plank is a 3d object. Flatten it out to fit on a piece of paper.
     pub fn flatten(&self) -> Result<FlattenedPlank, Error> {
-        let (first_len, quads) = self.quads()?;
+        let (first_len, triangles) = self.triangles()?;
         let mut top_line = vec![];
         let mut bottom_line = vec![];
         // Start with the leftmost points; assume WLOG they are at x=0.
@@ -83,14 +112,10 @@ impl Plank {
         let mut bot_pt = P2::new(0.0, first_len);
         top_line.push(top_pt);
         bottom_line.push(bot_pt);
-        // Add each quad successively.
-        for quad in &quads {
-            let top_vec = normalize(&(bot_pt - top_pt)) * quad.top_len;
-            let top_rot = Rotation2::new(-quad.top_angle);
-            let new_top_pt = top_pt + top_rot * top_vec;
-            let bot_vec = normalize(&(top_pt - bot_pt)) * quad.bot_len;
-            let bot_rot = Rotation2::new(quad.bot_angle);
-            let new_bot_pt = bot_pt + bot_rot * bot_vec;
+        // Add each triangle successively.
+        for &(a, b, c, d) in &triangles {
+            let new_top_pt = triangulate(top_pt, bot_pt, a, b);
+            let new_bot_pt = triangulate(new_top_pt, bot_pt, c, d);
             top_line.push(new_top_pt);
             bottom_line.push(new_bot_pt);
             top_pt = new_top_pt;
@@ -102,12 +127,12 @@ impl Plank {
         })
     }
 
-    // Give the "leftmost" edge length, then quads from "left" to "right".
-    fn quads(&self) -> Result<(f32, Vec<Quad>), Error> {
-        let top_pts = self.top_line.sample();
-        let bot_pts = self.bottom_line.sample();
+    // Give the leftmost edge length, then triangle lengths from left to right.
+    fn triangles(&self) -> Result<(f32, Vec<Triangles>), Error> {
+        let top_pts = self.top_line.sample(Some(self.resolution));
+        let bot_pts = self.bottom_line.sample(Some(self.resolution));
         let left_len = distance(&top_pts[0], &bot_pts[0]);
-        let mut quads = vec![];
+        let mut triangles = vec![];
         if top_pts.len() != bot_pts.len() {
             panic!(
                 concat!(
@@ -120,38 +145,36 @@ impl Plank {
         }
         let n = top_pts.len();
         for i in 0..n - 1 {
-            quads.push(Quad {
-                top_len: distance(&top_pts[i], &top_pts[i + 1]),
-                bot_len: distance(&bot_pts[i], &bot_pts[i + 1]),
-                top_angle: rotation_between(
-                    &(top_pts[i + 1] - top_pts[i]),
-                    &(top_pts[i] - bot_pts[i]),
-                )?.angle(),
-                bot_angle: rotation_between(
-                    &(bot_pts[i + 1] - bot_pts[i]),
-                    &(bot_pts[i] - top_pts[i]),
-                )?.angle(),
-            });
+            triangles.push((
+                distance(&top_pts[i], &top_pts[i + 1]),
+                distance(&bot_pts[i], &top_pts[i + 1]),
+                distance(&top_pts[i + 1], &bot_pts[i + 1]),
+                distance(&bot_pts[i], &bot_pts[i + 1]),
+            ));
         }
-        Ok((left_len, quads))
+        Ok((left_len, triangles))
     }
-    pub fn outline(&self) -> Vec<P3> {
-        let mut all_points = self.top_line.sample();
-        all_points.extend(&self.bottom_line.sample());
-        all_points
+
+    pub fn render_3d(&self) -> Result<Tree, Error> {
+        // Get the lines (bottom includes edges)
+        let top_line = self.top_line.sample(None);
+        let mut bottom_line = vec![];
+        bottom_line.push(top_line[0]);
+        bottom_line.extend(self.bottom_line.sample(None));
+        bottom_line.push(*top_line.last().unwrap());
+        // render the lines (top is dotted)
+        let dots = ScadPath::new(top_line)
+            .stroke(SCAD_STROKE)
+            .link(PathStyle3::Dots)?;
+        let solid = ScadPath::new(bottom_line)
+            .stroke(SCAD_STROKE)
+            .link(PathStyle3::Line)?;
+        // return the rendering
+        Ok(Tree::Union(vec![dots, solid]))
     }
 }
 
-struct Quad {
-    // top left interior angle
-    top_angle: f32,
-    // bottom left interior angle
-    bot_angle: f32,
-    // top edge length
-    top_len: f32,
-    // bottom edge length
-    bot_len: f32,
-}
+type Triangles = (f32, f32, f32, f32);
 
 impl Hull {
     /// Get a set of planks that can cover the hull.
@@ -161,15 +184,10 @@ impl Hull {
     /// Planks are meant to be layed out from the bottom of the ship
     /// to the top; as a result, the bottommost plank has no overlap.
     pub fn get_planks(&self) -> Result<Vec<Plank>, Error> {
-        let n = self.planks.plank_locations.len() - 1;
+        let n = self.planks.plank_locations.len() / 2;
         let mut planks = vec![];
         for i in 0..n {
-            let at_end = i + 1 == n;
-            let offset = if at_end {
-                0.
-            } else {
-                self.overlap
-            };
+            let i = i * 2;
             let bot_locs = &self.planks.plank_locations[i];
             let top_locs = &self.planks.plank_locations[i + 1];
             let mut bot_line = vec![];
@@ -177,25 +195,46 @@ impl Hull {
             for (j, ref station) in self.planks.stations.iter().enumerate() {
                 let bot_f = bot_locs[j];
                 let top_f = top_locs[j];
-                if let (Some(bot_f), Some(top_f)) = (bot_f, top_f) {
-                    bot_line.push(self.get_point(bot_f, 0.0, station)?);
-                    top_line.push(self.get_point(top_f, offset, station)?);
+
+                if let Some(bot_f) = bot_f {
+                    bot_line.push(self.get_point(bot_f, station)?);
+                }
+                if let Some(top_f) = top_f {
+                    top_line.push(self.get_point(top_f, station)?);
                 }
             }
-            planks.push(Plank {
-                bottom_line: Spline::new(bot_line, self.plank_resolution)?,
-                top_line: Spline::new(top_line, self.plank_resolution)?,
-            });
+            planks.push(Plank::new(bot_line, top_line, self.plank_resolution)?)
         }
         Ok(planks)
     }
 
-    /// Get a line across the hull that is a constant fraction `f`
+    /// Get planks flattened to 2d.
+    pub fn get_flattened_planks(&self) -> Result<Vec<FlattenedPlank>, Error> {
+        let flattened_planks = self.get_planks()?
+            .into_iter()
+            .map(|plank| plank.flatten())
+            .collect::<Result<Vec<FlattenedPlank>, Error>>()?;
+        let flattened_planks = flattened_planks.into_iter();
+        let mut layed_planks = vec![];
+        let mut last_y = None;
+        for mut plank in flattened_planks {
+            plank.orient_horizontally();
+            if let Some(last_y) = last_y {
+                let y = plank.min_coord(Axis::Y);
+                plank.shift_up(last_y - y + 2.0 * EQUALITY_THRESHOLD);
+            }
+            last_y = Some(plank.max_coord(Axis::Y));
+            layed_planks.push(plank);
+        }
+        Ok(layed_planks)
+    }
+
+    /// Get a line across the hull that is a constant fraction `t`
     /// of the distance along the edge of each cross section.
-    fn get_line(&self, f: f32, offset: f32) -> Result<Spline, Error> {
+    fn get_line(&self, t: f32) -> Result<Spline, Error> {
         let points = self.stations
             .iter()
-            .map(|station| station.at(f, offset))
+            .map(|station| station.at_t(t))
             .collect();
         Spline::new(points, self.plank_resolution)
     }
@@ -211,20 +250,15 @@ impl Hull {
         bail!("Station {} not found.", station_name);
     }
 
-    // Get a point a fraction `f` of the way along the curve of the
-    // given station (plus offset).
-    fn get_point(
-        &self,
-        f: f32,
-        offset: f32,
-        station: &PlankStation,
-    ) -> Result<P3, Error> {
+    // Get a point a fraction `t` of the way along the curve of the
+    // given station.
+    fn get_point(&self, t: f32, station: &PlankStation) -> Result<P3, Error> {
         match station {
             &PlankStation::Station(ref station_name) => {
-                Ok(self.get_station(station_name)?.at(f, offset))
+                Ok(self.get_station(station_name)?.at_t(t))
             }
             &PlankStation::Position(posn) => {
-                Ok(self.hallucinate_station(posn)?.at(f, offset))
+                Ok(self.hallucinate_station(posn)?.at_t(t))
             }
         }
     }
@@ -233,8 +267,8 @@ impl Hull {
         let mut points = vec![];
         let resolution = 10;
         for i in 0..resolution + 1 {
-            let f = i as f32 / resolution as f32;
-            let line = self.get_line(f, 0.0)?;
+            let t = i as f32 / resolution as f32;
+            let line = self.get_line(t)?;
             points.push(line.at_x(posn.into())?);
         }
         let name = format!("{}", posn);
@@ -279,7 +313,7 @@ impl Hull {
         let mut paths = self.draw_height_breadth_grid();
         let half = (self.stations.len() as f32) / 2.;
         for (i, station) in self.stations.iter().enumerate() {
-            let mut samples: Vec<P3> = station.spline.sample();
+            let mut samples: Vec<P3> = station.spline.sample(None);
             let mut points: Vec<P3> = station.points.clone();
             if (i as f32) >= half {
                 samples = reflect3(Axis::Y, &samples);
@@ -382,6 +416,13 @@ impl Hull {
             col_bound = Bound::empty_at(col_bound.relative_pos(1.1, 0.));
         }
         Ok(doc)
+
+    pub fn render_station_at(&self, posn: Feet) -> Result<Tree, Error> {
+        let station = self.hallucinate_station(posn)?;
+        Ok(ScadPath::new(station.points.clone())
+            .stroke(0.1)
+            .show_points()
+            .link(PathStyle3::Line)?)
     }
 
     pub fn render_stations(&self) -> Result<Tree, Error> {
@@ -418,7 +459,7 @@ impl Station {
     }
 
     pub fn render_spline_2d(&self) -> SvgPath {
-        SvgPath::new(project_points(Axis::X, &self.spline.sample()))
+        SvgPath::new(project_points(Axis::X, &self.spline.sample(None)))
             .stroke(SvgColor::Black, 2.0)
             .style(PathStyle2::Line)
     }
@@ -429,12 +470,10 @@ impl Station {
             .style(PathStyle2::Dots)
     }
 
-    /// Get a point along the curve of this station a fraction `f` of
-    /// the way along the curve, plus `offset`.
-    pub fn at(&self, f: f32, offset: f32) -> P3 {
-        let len = self.spline.length();
-        let dist = f * len + offset;
-        self.spline.at(dist)
+    /// Get a point along the curve of this station a fraction `t` of
+    /// the way along the curve.
+    pub fn at_t(&self, t: f32) -> P3 {
+        self.spline.at_t(t)
     }
 
     fn get_cross_section_path(&self) -> SvgPath {
@@ -509,7 +548,6 @@ impl Spec {
             heights: self.get_heights(),
             wale: wale,
             planks: self.planks.clone(),
-            overlap: self.config.plank_overlap()?.into(),
             plank_resolution: self.config.plank_resolution,
             station_resolution: self.config.station_resolution,
         })
@@ -578,4 +616,39 @@ fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
 
 fn point(x: Feet, y: Feet, z: Feet) -> P3 {
     P3::new(x.into(), y.into(), z.into())
+}
+
+/// Given two points and two edge lengths (and another number, for
+/// horrifying edge cases), find a third point that makes a triangle
+/// with those two points and those two edge lengths.
+fn triangulate(pt1: P2, pt2: P2, x: f32, y: f32) -> P2 {
+    // Use law of cosines.
+    //    yy = ll + xx -2lx*cos(pt1_angle)
+    // -> pt1_angle = acos((ll + xx - yy) / 2lx)
+    let l = distance(&pt1, &pt2);
+    if practically_zero(10.0 * l) {
+        pt1 + V2::new(-x, 0.0)
+    } else if practically_zero(x) {
+        let pt2_angle =
+            Rotation2::new(-f32::acos((l * l + y * y - x * x) / (2.0 * l * y)));
+        pt2 + y * (pt2_angle * normalize(&(pt1 - pt2)))
+    } else {
+        let pt1_angle =
+            Rotation2::new(f32::acos((l * l + x * x - y * y) / (2.0 * l * x)));
+        pt1 + x * (pt1_angle * normalize(&(pt2 - pt1)))
+    }
+}
+
+#[test]
+fn test_triangulate() {
+    let pt1 = P2::new(1.0, 4.0);
+    let pt2 = P2::new(1.0, 1.0);
+    let x = 4.0;
+    let y = 5.0;
+    assert_eq!(triangulate(pt1, pt2, x, y), P2::new(5.0, 4.0));
+    let pt1 = P2::new(0.0, 1.0);
+    let pt2 = P2::new(1.0, 0.0);
+    let x = f32::sqrt(2.0);
+    let y = f32::sqrt(2.0);
+    assert_eq!(triangulate(pt1, pt2, x, y), P2::new(1.3660253, 1.3660254));
 }

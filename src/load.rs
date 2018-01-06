@@ -1,6 +1,6 @@
 //! Read in ship data from csv files.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::iter;
 use std::io;
@@ -12,30 +12,39 @@ use failure::{Error, ResultExt};
 use unit::*;
 use spec::*;
 
-/// Read the data file, which contains reference points along cross
-/// sections of the hull.
-pub fn read_data(path: &Path) -> Result<Data, Error> {
-    let reader = open_csv_file(path)?;
-    Ok(read_data_from_csv(reader)
-        .context(format!("Could not parse file {:?}.", path))?)
+/// Read the three spec files from a given directory.
+/// data.csv contains reference points along cross sections of the hull.
+/// planks.csv says where planks should be placed on the hull.
+/// config.csv has various configuration options.
+pub fn load_spec(path: &Path) -> Result<Spec, Error> {
+    // Read data.csv
+    let data_path = &extend_path(path, "data.csv");
+    let data = read_data_from_csv(open_csv_file(data_path)?)
+        .context(format!("Could not parse file {:?}.", data_path))?;
+    // Read planks.csv
+    let planks_path = &extend_path(path, "planks.csv");
+    let planks = read_planks_from_csv(open_csv_file(planks_path)?)
+        .context(format!("Could not parse file {:?}.", planks_path))?;
+    // Read config.csv
+    let config_path = &extend_path(path, "config.csv");
+    let config = read_config_from_csv(open_csv_file(config_path)?)
+        .context(format!("Could not parse file {:?}.", config_path))?;
+    Ok(Spec {
+        data: data,
+        planks: planks,
+        config: config,
+    })
 }
 
-/// Read the plank file, which says where planks should be placed on the hull.
-pub fn read_planks(path: &Path) -> Result<Planks, Error> {
-    let reader = open_csv_file(path)?;
-    Ok(read_planks_from_csv(reader)
-        .context(format!("Could not parse file {:?}.", path))?)
-}
-
-/// Read the configuration file.
-pub fn read_config(path: &Path) -> Result<Config, Error> {
-    let reader = open_csv_file(path)?;
-    Ok(read_config_from_csv(reader)
-        .context(format!("Could not parse file {:?}.", path))?)
+fn extend_path(path: &Path, ext: &str) -> PathBuf {
+    let mut path = path.to_path_buf();
+    path.push(ext);
+    path
 }
 
 fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, Error> {
-    Ok(csv::Reader::from_path(path)
+    println!("Loading file {:?}.", path);
+    Ok(csv::Reader::from_path(&path)
         .context(format!("Could not read file {:?}.", path))?)
 }
 
@@ -43,7 +52,6 @@ fn read_planks_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Planks, Error>
 where
     T: io::Read,
 {
-    println!("Parsing planks file.");
     let mut stations = vec![];
     {
         let headers = csv.headers();
@@ -74,7 +82,6 @@ fn read_config_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Config, Error>
 where
     T: io::Read,
 {
-    println!("Parsing config file.");
     match csv.deserialize().next() {
         None => bail!("Found no rows in config file."),
         Some(row) => Ok(row?),
@@ -86,7 +93,6 @@ where
     T: io::Read,
 {
     // Read stations
-    println!("Parsing stations.");
     let mut stations = vec![];
     {
         let headers = csv.headers();
@@ -108,7 +114,6 @@ where
         match read_section_name(&mut recs)? {
             None => break,
             Some(section) => {
-                println!("Parsing section {:?}.", section);
                 match section {
                     Section::Positions => {
                         read_section(&mut recs, &mut positions)
