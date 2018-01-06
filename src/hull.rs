@@ -10,8 +10,11 @@ use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
 use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
-use render_2d::{PathStyle2, SvgColor, SvgPath};
+use render_2d::{Bound, PathStyle2, SvgCircle, SvgColor, SvgDoc, SvgGroup,
+                SvgPath};
 use util::project_points;
+// use svg::Node;
+// use svg::node::element::Group;
 
 /// A ship's hull.
 #[derive(MinMaxCoord)]
@@ -49,7 +52,7 @@ impl FlattenedPlank {
     /// Render as an SVG path.
     pub fn render_2d(&self) -> SvgPath {
         SvgPath::new(self.get_path())
-            .stroke(SvgColor::Black, 2.0)
+            .stroke(SvgColor::Black, 0.01)
             .style(PathStyle2::Line)
     }
 
@@ -301,6 +304,7 @@ impl Hull {
     }
 
     pub fn draw_half_breadths(&self) -> Vec<SvgPath> {
+        let stroke = 0.02;
         let mut paths = self.draw_height_breadth_grid();
         let half = (self.stations.len() as f32) / 2.;
         for (i, station) in self.stations.iter().enumerate() {
@@ -312,16 +316,101 @@ impl Hull {
             }
             paths.push(
                 SvgPath::new(project_points(Axis::X, &samples))
-                    .stroke(SvgColor::Black, 2.0)
+                    .stroke(SvgColor::Black, stroke)
                     .style(PathStyle2::Line),
             );
             paths.push(
                 SvgPath::new(project_points(Axis::X, &points))
-                    .stroke(SvgColor::Black, 2.0)
+                    .stroke(SvgColor::Black, stroke)
                     .style(PathStyle2::Dots),
             );
         }
         paths
+    }
+
+    pub fn draw_cross_sections(
+        &self,
+        excluded: &[String],
+    ) -> Result<SvgDoc, Error> {
+        const HOLE_DIAMETER: f32 = 0.125;
+        const STROKE: f32 = 0.02;
+        let mut paths = Vec::new();
+        let mut bounds = Vec::new();
+        for station in &self.stations {
+            if excluded.contains(&station.name) {
+                continue;
+            }
+            let path = station
+                .get_cross_section_path()
+                .stroke(SvgColor::Black, 0.02);
+            bounds.push(path.bound());
+            paths.push((station.name.clone(), path));
+        }
+
+        let max_y = Bound::union_all(&bounds).high.y;
+        let intersection = Bound::intersect_all(&bounds).ok_or_else(|| {
+            format_err!(
+                "cross-sections have no overlap in which to place alignment holes"
+            )
+        })?;
+
+        let hole_positions = vec![
+            intersection.relative_pos(0.5, 0.33),
+            intersection.relative_pos(0.5, 0.66),
+        ];
+
+        let make_holes = || -> Result<SvgGroup, Error> {
+            // This is to work around the fact that SvgGroup cannot be cloned,
+            // because svg library types can't be. Recreate the group everytime,
+            // instead.
+            let mut holes = SvgGroup::new();
+            for &pos in &hole_positions {
+                let hole = SvgCircle::new(pos, HOLE_DIAMETER/2.)
+                    .stroke(SvgColor::Black, STROKE);
+                if !intersection.contains(&hole.bound()) {
+                    bail!("hole doesn't fit in overlap between cross-sections");
+                }
+                holes.append_node(
+                    hole.finalize()
+                )
+            }
+            Ok(holes)
+        };
+
+        let mut doc = SvgDoc::new();
+        let cols = (paths.len() as f32).sqrt() as usize;
+
+        let mut col_bound = Bound::new();
+        for col in paths.chunks(cols) {
+            for &(ref _name, ref path) in col {
+                // Add tab to each cross-section, for mounting it into a jig
+                let mut path = path.to_owned();
+                let tab_length = V2::new(0.75 * path.bound().width(), 0.);
+                let tab_center = P2::new(path.bound().center().x, 1.2 * max_y);
+                path.append(vec![tab_center - tab_length /2., tab_center + tab_length /2.]);
+
+                // // TODO Add text label with name of cross-section
+                // let label = SvgText {
+                //     lines: vec![name.into()],
+                //     pos: path.bound().center(),
+                //     color: SvgColor::Black,
+                //     size: 0.2,
+                // }
+
+                let mut group = SvgGroup::new();
+                group.append_path(path.to_owned());
+
+                // Translate into grid
+                group.translate_to(col_bound.relative_pos(0., 1.1));
+                let holes = make_holes()?;
+                group.append_group(holes);
+                // TODO letters
+                col_bound = col_bound.union(group.bound());
+                doc.append_group(group);
+            }
+            col_bound = Bound::empty_at(col_bound.relative_pos(1.1, 0.));
+        }
+        Ok(doc)
     }
 
     pub fn render_station_at(&self, posn: Feet) -> Result<Tree, Error> {
@@ -381,6 +470,18 @@ impl Station {
     /// the way along the curve.
     pub fn at_t(&self, t: f32) -> P3 {
         self.spline.at_t(t)
+    }
+
+    fn get_cross_section_path(&self) -> SvgPath {
+        // Draw right and left halves of cross-section
+        let mut points: Vec<_> = self.spline.sample(None)
+            .into_iter().rev().collect();
+        let left = reflect3(Axis::Y, &points);
+        points.extend(left.iter().rev());
+        SvgPath::new(project_points(Axis::X, &points))
+            .stroke(SvgColor::Black, 0.02)
+            .style(PathStyle2::Line)
+            .close()
     }
 }
 
