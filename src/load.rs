@@ -36,10 +36,11 @@ pub fn load_spec(path: &Path) -> Result<Spec, Error> {
     })
 }
 
-fn extend_path(path: &Path, ext: &str) -> PathBuf {
-    let mut path = path.to_path_buf();
-    path.push(ext);
-    path
+#[derive(Debug)]
+enum Section {
+    Positions,
+    Heights,
+    Breadths,
 }
 
 fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, Error> {
@@ -109,7 +110,6 @@ where
     let mut positions = vec![];
     let mut heights = vec![];
     let mut breadths = vec![];
-    let mut diagonals = vec![];
     loop {
         match read_section_name(&mut recs)? {
             None => break,
@@ -120,9 +120,6 @@ where
                     }
                     Section::Heights => read_section(&mut recs, &mut heights),
                     Section::Breadths => read_section(&mut recs, &mut breadths),
-                    Section::Diagonals => {
-                        read_section(&mut recs, &mut diagonals)
-                    }
                 }
             }.context(format!(
                 "Could not parse section {:?}.",
@@ -136,7 +133,6 @@ where
         positions: positions,
         heights: heights,
         breadths: breadths,
-        diagonals: diagonals,
     })
 }
 
@@ -193,12 +189,11 @@ where
                     "fore-aft position" => Ok(Some(Section::Positions)),
                     "height" => Ok(Some(Section::Heights)),
                     "breadth" => Ok(Some(Section::Breadths)),
-                    "diagonal" => Ok(Some(Section::Diagonals)),
                     _ => bail!(
                         concat!(
                             "Did not recognize the name {}. ",
                             "Expected one of these section names: ",
-                            "Height, Breadth, Diagonal, Fore-Aft Position."
+                            "Height, Breadth, Fore-Aft Position."
                         ),
                         name
                     ),
@@ -236,10 +231,37 @@ fn read_plank_station(text: &str) -> PlankStation {
     }
 }
 
-#[derive(Debug)]
-enum Section {
-    Positions,
-    Heights,
-    Breadths,
-    Diagonals,
+fn extend_path(path: &Path, ext: &str) -> PathBuf {
+    let mut path = path.to_path_buf();
+    path.push(ext);
+    path
+}
+
+impl FromStr for BreadthLine {
+    type Err = Error;
+    fn from_str(text: &str) -> Result<BreadthLine, Error> {
+        match text.to_lowercase().as_str() {
+            "sheer" => Ok(BreadthLine::Sheer),
+            "wale" => Ok(BreadthLine::Wale),
+            text => {
+                let feet =
+                    Feet::parse(text).context("Was unable to read height.")?;
+                Ok(BreadthLine::ButOut(feet.into()))
+            }
+        }
+    }
+}
+
+impl FromStr for HeightLine {
+    type Err = Error;
+    fn from_str(text: &str) -> Result<HeightLine, Error> {
+        match text.to_lowercase().as_str() {
+            "sheer" => Ok(HeightLine::Sheer),
+            text => {
+                let feet =
+                    Feet::parse(text).context("Was unable to read breadth.")?;
+                Ok(HeightLine::WLUp(feet.into()))
+            }
+        }
+    }
 }

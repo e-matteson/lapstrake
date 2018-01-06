@@ -2,7 +2,7 @@ use failure::Error;
 
 use scad_dots::core::{chain, Dot, DotAlign, DotSpec, Shape, Tree};
 use scad_dots::utils::{P3, R3};
-// use scad_dots::parse::scad_relative_eq;
+use scad_dots::harness::preview_model;
 
 /// Example:
 ///
@@ -29,6 +29,10 @@ pub enum PathStyle3 {
     Dots,
     Line,
     Solid,
+}
+
+pub fn view_3d(renderings: Vec<Tree>) -> Result<(), Error> {
+    preview_model(&Tree::Union(renderings))
 }
 
 impl ScadPath {

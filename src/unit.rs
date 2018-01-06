@@ -57,7 +57,6 @@ impl Feet {
             "Was not able to read measurement. ",
             "Expected formatting like 3-4-5 for 3' 4 5/8\"."
         );
-
         match parts.as_slice() {
             &[feet, inches, eighths] => Ok(Some(Feet {
                 feet: parse_usize(&feet).context(message)?,
@@ -83,16 +82,6 @@ impl Into<f32> for Feet {
             + (self.eighths as f32 / 12. / 8.)
     }
 }
-
-// impl Into<Feet> for usize {
-//     fn into(self) -> Feet {
-//         Feet {
-//             feet: ((self / 8) / 12) as u32,
-//             inches: ((self / 8) % 12) as u32,
-//             eighths: (self % 8) as u32,
-//         }
-//     }
-// }
 
 impl fmt::Debug for Feet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

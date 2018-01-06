@@ -39,7 +39,7 @@ pub struct SvgPath {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct SvgCircle {
+struct SvgCircle {
     pos: P2,
     radius: f32,
     fill: SvgColor,

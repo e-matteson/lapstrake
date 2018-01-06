@@ -2,8 +2,7 @@
 
 use std::fmt;
 use std::cmp;
-use std::str::FromStr;
-use failure::{Error, ResultExt};
+use failure::Error;
 
 use unit::*;
 
@@ -30,12 +29,9 @@ pub struct Data {
     /// the half-breadth from centerline
     /// at each height above base.
     pub breadths: Vec<DataRow<HeightLine>>,
-    /// For each station,
-    /// the distance along the diagonal lines (given in Config).
-    pub diagonals: Vec<DataRow<DiagonalLine>>,
 }
 
-/// One row of Data. `T` is one of HeightLine, BreadthLine, DiagonalLine.
+/// One row of Data. `T` is one of HeightLine, BreadthLine.
 pub type DataRow<T> = (T, Vec<Option<Feet>>);
 
 /// Where planks should lie on the hull.
@@ -61,18 +57,10 @@ pub enum PlankStation {
 /// Configuration options.
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub station_resolution: usize,
-    pub plank_resolution: usize,
-    pub number_of_planks: usize,
-    plank_overlap: String,
+    pub resolution: usize,
 }
 
-impl Config {
-    pub fn plank_overlap(&self) -> Result<f32, Error> {
-        Ok(Feet::parse(&self.plank_overlap)?.into())
-    }
-}
-
+/// A line along the hull of constant breadth.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BreadthLine {
     Sheer,
@@ -80,19 +68,16 @@ pub enum BreadthLine {
     ButOut(Feet),
 }
 
+/// A line along the hull of constant height.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeightLine {
     Sheer,
     WLUp(Feet),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiagonalLine {
-    A,
-    B,
-}
-
 impl Spec {
+    /// Get the position of the nth station.
+    /// (This is by index, not by name.)
     pub fn get_station_position(
         &self,
         station: usize,
@@ -101,10 +86,12 @@ impl Spec {
         Spec::lookup(&self.data.positions, station, line)
     }
 
+    /// Get the breadth of the sheer at the nth station.
     pub fn get_sheer_breadth(&self, station: usize) -> Result<Feet, Error> {
         Spec::lookup(&self.data.breadths, station, HeightLine::Sheer)
     }
 
+    /// Get the height of the sheer at the nth station.
     pub fn get_sheer_height(&self, station: usize) -> Result<Feet, Error> {
         Spec::lookup(&self.data.heights, station, BreadthLine::Sheer)
     }
@@ -130,48 +117,5 @@ impl Spec {
             measurement,
             station_index
         );
-    }
-}
-
-impl FromStr for BreadthLine {
-    type Err = Error;
-    fn from_str(text: &str) -> Result<BreadthLine, Error> {
-        match text.to_lowercase().as_str() {
-            "sheer" => Ok(BreadthLine::Sheer),
-            "wale" => Ok(BreadthLine::Wale),
-            text => {
-                let feet =
-                    Feet::parse(text).context("Was unable to read height.")?;
-                Ok(BreadthLine::ButOut(feet.into()))
-            }
-        }
-    }
-}
-
-impl FromStr for HeightLine {
-    type Err = Error;
-    fn from_str(text: &str) -> Result<HeightLine, Error> {
-        match text.to_lowercase().as_str() {
-            "sheer" => Ok(HeightLine::Sheer),
-            text => {
-                let feet =
-                    Feet::parse(text).context("Was unable to read breadth.")?;
-                Ok(HeightLine::WLUp(feet.into()))
-            }
-        }
-    }
-}
-
-impl FromStr for DiagonalLine {
-    type Err = Error;
-    fn from_str(text: &str) -> Result<DiagonalLine, Error> {
-        match text.to_lowercase().as_str() {
-            "a" => Ok(DiagonalLine::A),
-            "b" => Ok(DiagonalLine::B),
-            _ => bail!(
-                concat!("Could not read diagonal {}. Expected A or B."),
-                text
-            ),
-        }
     }
 }

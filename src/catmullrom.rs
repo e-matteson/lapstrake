@@ -31,27 +31,32 @@ impl Segment {
 }
 
 impl CentripetalCatmullRom {
+    /// Construct a Centripetal Catmull-Rom Spline along the four
+    /// given points. It is best to sample from the inner segment. The
+    /// outer two points are meant to be control points.  (However,
+    /// for our rendering we sometimes do need to sample from the
+    /// outer segments, so we give that as an option, and hack up an
+    /// answer in that case.)
     pub fn new(points: [P3; 4]) -> CentripetalCatmullRom {
+        fn knot(points: &[P3; 4], i: usize, prev_knot: f32) -> f32 {
+            // 'centripetal' means alpha = 1/2, so take sqrt.
+            f32::sqrt(distance(&points[i], &points[i - 1])) + prev_knot
+        }
+
         // Compute knots
         let t_0 = 0.0;
         let t_1 = knot(&points, 1, t_0);
         let t_2 = knot(&points, 2, t_1);
         let t_3 = knot(&points, 3, t_2);
         let knots = [t_0, t_1, t_2, t_3];
-        let c = CentripetalCatmullRom {
+        CentripetalCatmullRom {
             points: points,
             knots: knots,
-        };
-        /*
-        println!("");
-        for i in 0..4 {
-            println!("{} {}", points[i], c.compute(knots[i]));
         }
-        */
-        c
     }
 
     /// Sample `resolution` points along the chosen segment of the spline.
+    /// (Or `resolution + 1` points if `at_end` is true.)
     pub fn sample(
         &self,
         segment: Segment,
@@ -61,30 +66,33 @@ impl CentripetalCatmullRom {
         let mut samples = vec![];
         for k in 0..resolution {
             let t = k as f32 / resolution as f32;
-            samples.push(self.at_segment(t, segment))
+            samples.push(self.at(t, segment))
         }
         if at_end {
-            samples.push(self.at_segment(1.0, segment));
+            // If at end of spline, push one extra point.
+            // E.g. if sampling from 3 segments of a spline with
+            // resolution 2, you want 2 + 2 + 3 = 7 points.
+            samples.push(self.at(1.0, segment));
         }
         samples
     }
 
-    fn at_segment(&self, f: f32, segment: Segment) -> P3 {
+    // Get the point on the spline a fraction `f` along the given segment.
+    fn at(&self, f: f32, segment: Segment) -> P3 {
         let i = segment.index();
         let t = self.knots[i] + f * (self.knots[i + 1] - self.knots[i]);
         self.compute(t, segment != Segment::Middle)
     }
 
-    fn compute(&self, t: f32, at_end: bool) -> P3 {
-        // Compute intermediates
+    // Get the point on the spline a fraction `t` along the full curve.
+    fn compute(&self, t: f32, use_lagrangian: bool) -> P3 {
         let a_1 = self.intermediate(0, 1, self.points[0], self.points[1], t);
         let a_2 = self.intermediate(1, 2, self.points[1], self.points[2], t);
         let a_3 = self.intermediate(2, 3, self.points[2], self.points[3], t);
         let b_1 = self.intermediate(0, 2, a_1, a_2, t);
         let b_2 = self.intermediate(1, 3, a_2, a_3, t);
-        // Compute answer
 
-        if at_end {
+        if use_lagrangian {
             // We're not at the middle segment.
             // Catmull-rom splines do not handle this case.
             // We're not really sure how to handle this case well.
@@ -95,6 +103,7 @@ impl CentripetalCatmullRom {
         }
     }
 
+    // The secret sauce.
     fn intermediate(&self, i: usize, j: usize, p: P3, q: P3, t: f32) -> P3 {
         let t_i = self.knots[i];
         let t_j = self.knots[j];
@@ -102,9 +111,4 @@ impl CentripetalCatmullRom {
         let right = (t - t_i) / (t_j - t_i) * q;
         P3::from_coordinates(left.coords + right.coords)
     }
-}
-
-fn knot(points: &[P3; 4], i: usize, prev_knot: f32) -> f32 {
-    // 'centripetal' means alpha = 1/2, so take sqrt.
-    f32::sqrt(distance(&points[i], &points[i - 1])) + prev_knot
 }

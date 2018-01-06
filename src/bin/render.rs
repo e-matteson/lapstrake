@@ -1,9 +1,8 @@
 extern crate lapstrake;
-#[macro_use]
-extern crate scad_dots;
 
+use std::iter;
 use std::path::Path;
-use lapstrake::{load_spec, preview_model, try, Tree};
+use lapstrake::{load_spec, try, view_3d};
 
 fn main() {
     try(|| {
@@ -18,10 +17,12 @@ fn main() {
         }
 
         // Render the planks & hull stations
-        preview_model(&union![
-            Tree::Union(plank_renderings),
-            hull.render_stations()?,
-        ])?;
+        let renderings = plank_renderings
+            .into_iter()
+            .chain(iter::once(hull.render_stations()?))
+            .collect();
+
+        view_3d(renderings)?;
 
         Ok(())
     })

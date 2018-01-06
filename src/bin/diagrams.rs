@@ -1,7 +1,8 @@
 extern crate lapstrake;
 
 use std::path::Path;
-use lapstrake::{load_spec, try, SvgDoc};
+use lapstrake::{load_spec, try};
+use lapstrake::render_2d::SvgDoc;
 
 fn main() {
     try(|| {

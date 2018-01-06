@@ -3,7 +3,8 @@ use scad_dots::utils::{Axis, P2, P3, V2};
 use scad_dots::core::{MinMaxCoord, Tree};
 use failure::Error;
 
-use util::practically_zero;
+use util::{practically_zero, remove_duplicates, reflect2, reflect3};
+use util::EQUALITY_THRESHOLD;
 use unit::Feet;
 use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
@@ -11,9 +12,6 @@ use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{PathStyle2, SvgColor, SvgPath};
 use util::project_points;
-
-// How near points must be to be considered equal, in feet.
-const EQUALITY_THRESHOLD: f32 = 0.05;
 
 /// A ship's hull.
 #[derive(MinMaxCoord)]
@@ -23,9 +21,7 @@ pub struct Hull {
     #[min_max_coord(ignore)] pub heights: Vec<f32>,
     #[min_max_coord(ignore)] pub breadths: Vec<f32>,
     #[min_max_coord(ignore)] planks: Planks,
-    #[min_max_coord(ignore)] station_resolution: usize,
-    #[min_max_coord(ignore)] plank_resolution: usize,
-    // TODO: store diagonals for drawing
+    #[min_max_coord(ignore)] resolution: usize,
 }
 
 /// A cross-section of the hull.
@@ -200,7 +196,7 @@ impl Hull {
                     top_line.push(self.get_point(top_f, station)?);
                 }
             }
-            planks.push(Plank::new(bot_line, top_line, self.plank_resolution)?)
+            planks.push(Plank::new(bot_line, top_line, self.resolution)?)
         }
         Ok(planks)
     }
@@ -233,7 +229,7 @@ impl Hull {
             .iter()
             .map(|station| station.at_t(t))
             .collect();
-        Spline::new(points, self.plank_resolution)
+        Spline::new(points, self.resolution)
     }
 
     // Get a position on the station that is a constant fraction `f`
@@ -269,8 +265,7 @@ impl Hull {
             points.push(line.at_x(posn.into())?);
         }
         let name = format!("{}", posn);
-        let resolution = self.station_resolution;
-        Station::new(name, points, resolution)
+        Station::new(name, points, self.resolution)
     }
 
     pub fn draw_height_breadth_grid(&self) -> Vec<SvgPath> {
@@ -392,7 +387,7 @@ impl Station {
 impl Spec {
     pub fn get_hull(&self) -> Result<Hull, Error> {
         let data = &self.data;
-        let resolution = self.config.station_resolution;
+        let resolution = self.config.resolution;
         let mut stations = vec![];
         let mut wale = vec![];
         for i in 0..data.stations.len() {
@@ -430,7 +425,6 @@ impl Spec {
                     }
                 }
             }
-            // TODO: diagonals
             // The points are out of order, and may contain duplicates.
             // Sort them and remove the duplicates.
             points.sort_by(|p, q| p.z.partial_cmp(&q.z).unwrap());
@@ -449,8 +443,7 @@ impl Spec {
             heights: self.get_heights(),
             wale: wale,
             planks: self.planks.clone(),
-            plank_resolution: self.config.plank_resolution,
-            station_resolution: self.config.station_resolution,
+            resolution: self.config.resolution,
         })
     }
 
@@ -478,41 +471,6 @@ impl Spec {
         }
         stored_heights
     }
-}
-
-fn remove_duplicates(points: Vec<P3>) -> Vec<P3> {
-    let mut good_points = vec![];
-    good_points.push(points[0]);
-    let mut prev_point = points[0];
-    for &point in &points[1..] {
-        if distance(&point, &prev_point) >= EQUALITY_THRESHOLD {
-            good_points.push(point);
-        }
-        prev_point = point;
-    }
-    good_points
-}
-
-fn reflect2(axis: Axis, points: &[P2]) -> Vec<P2> {
-    points
-        .iter()
-        .map(|p| {
-            let mut new = *p;
-            new[axis.index()] *= -1.;
-            new
-        })
-        .collect()
-}
-
-fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
-    points
-        .iter()
-        .map(|p| {
-            let mut new = *p;
-            new[axis.index()] *= -1.;
-            new
-        })
-        .collect()
 }
 
 fn point(x: Feet, y: Feet, z: Feet) -> P3 {

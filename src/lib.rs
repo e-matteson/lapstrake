@@ -21,17 +21,16 @@ mod util;
 mod spline;
 mod hull;
 mod render_3d;
-mod render_2d;
 
-pub use util::print_error;
 pub use load::load_spec;
-pub use render_2d::SvgDoc;
-pub use scad_dots::core::Tree;
-pub use scad_dots::harness::preview_model;
-pub use hull::FlattenedPlank;
+pub use render_3d::view_3d;
+pub mod render_2d;
+pub use spec::*;
+pub use hull::*;
 
 use std::process;
 use failure::Error;
+use util::print_error;
 
 pub fn try<F>(run: F)
 where
