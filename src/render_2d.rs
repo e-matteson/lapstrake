@@ -61,7 +61,7 @@ pub struct SvgRect {
 #[derive(Clone)]
 pub struct SvgGroup {
     group: Group,
-    pub bound: Bound,
+    bound: Option<Bound>,
     translation: Option<V2>,
 }
 
@@ -100,6 +100,15 @@ pub struct SvgText {
     pub size: f32,
 }
 
+pub trait Bounded {
+    fn bound(&self) -> Option<Bound>;
+}
+
+pub trait ToSvg {
+    type Output: Node;
+    fn finalize(self) -> Self::Output;
+}
+
 impl SvgDoc {
     pub fn new() -> SvgDoc {
         SvgDoc {
@@ -114,37 +123,47 @@ impl SvgDoc {
         self.contents.append_node(node)
     }
 
-    pub fn append_group(&mut self, group: SvgGroup) {
-        self.contents.append_group(group)
+    pub fn append<T>(&mut self, thing: T)
+    where
+        T: ToSvg + Bounded,
+    {
+        self.contents.append(thing)
     }
 
-    pub fn append_path(&mut self, path: SvgPath) {
-        self.contents.append_path(path)
-    }
-    pub fn append_paths(&mut self, paths: Vec<SvgPath>) {
-        for path in paths {
-            self.append_path(path);
+    pub fn append_vec<T>(&mut self, things: Vec<T>)
+    where
+        T: ToSvg + Bounded,
+    {
+        for thing in things {
+            self.append(thing);
         }
-    }
-
-    pub fn bound(&self) -> Bound {
-        self.contents.bound
-    }
-
-    pub fn finalize(self) -> Document {
-        let bound = self.bound();
-        let background =
-            SvgRect::new(bound.low, bound.size()).fill(SvgColor::White);
-        let doc = Document::new()
-            .set("viewBox", bound.view_box())
-            .add(background.finalize())
-            .add(self.contents.finalize());
-        doc
     }
 
     pub fn save(self, filename: &str) -> Result<(), Error> {
         println!("Saving svg file {}.", filename);
         Ok(svg::save(filename, &self.finalize())?)
+    }
+}
+
+impl ToSvg for SvgDoc {
+    type Output = Document;
+
+    fn finalize(self) -> Self::Output {
+        let mut doc = Document::new();
+        if let Some(bound) = self.bound() {
+            let background =
+                SvgRect::new(bound.low, bound.size()).fill(SvgColor::White);
+            doc.append(background.finalize());
+            doc.assign("viewBox", bound.view_box());
+        }
+        doc.append(self.contents.finalize());
+        doc
+    }
+}
+
+impl Bounded for SvgDoc {
+    fn bound(&self) -> Option<Bound> {
+        self.contents.bound
     }
 }
 
@@ -188,26 +207,9 @@ impl SvgPath {
             .extend(new_points.into_iter().map(|p| SCALE * p))
     }
 
-    pub fn finalize(self) -> Group {
-        let mut group = Group::new();
-        if self.style.has_line() {
-            let mut path = Path::new();
-            path.assign("d", self.path_data());
-            path.assign("stroke", self.stroke.color);
-            path.assign("stroke-width", self.stroke.width);
-            path.assign("fill", "none");
-            group.append(path);
-        }
-
-        if self.style.has_dots() {
-            group.append(self.dots())
-        }
-        group
-    }
-
     pub fn save(self, filename: &str) -> Result<(), Error> {
         let mut doc = SvgDoc::new();
-        doc.append_path(self);
+        doc.append(self);
         doc.save(filename)?;
         Ok(())
     }
@@ -238,8 +240,31 @@ impl SvgPath {
         }
         data
     }
+}
 
-    pub fn bound(&self) -> Bound {
+impl ToSvg for SvgPath {
+    type Output = Group;
+
+    fn finalize(self) -> Self::Output {
+        let mut group = Group::new();
+        if self.style.has_line() {
+            let mut path = Path::new();
+            path.assign("d", self.path_data());
+            path.assign("stroke", self.stroke.color);
+            path.assign("stroke-width", self.stroke.width);
+            path.assign("fill", "none");
+            group.append(path);
+        }
+
+        if self.style.has_dots() {
+            group.append(self.dots())
+        }
+        group
+    }
+}
+
+impl Bounded for SvgPath {
+    fn bound(&self) -> Option<Bound> {
         let center = self.points.midpoint2();
 
         let size = V2::new(
@@ -247,10 +272,10 @@ impl SvgPath {
             self.points.bound_length(Axis::Y),
         );
 
-        Bound {
+        Some(Bound {
             low: center - size / 2.,
             high: center + size / 2.,
-        }
+        })
     }
 }
 
@@ -294,16 +319,12 @@ impl SvgCircle {
         self.fill = Some(fill);
         self
     }
+}
 
-    pub fn bound(&self) -> Bound {
-        let offset = V2::new(self.radius, self.radius);
-        Bound {
-            low: self.pos - offset,
-            high: self.pos + offset,
-        }
-    }
+impl ToSvg for SvgCircle {
+    type Output = Circle;
 
-    pub fn finalize(self) -> Circle {
+    fn finalize(self) -> Self::Output {
         let mut element = Circle::new()
             .set("cx", self.pos.x)
             .set("cy", self.pos.y)
@@ -321,6 +342,16 @@ impl SvgCircle {
         }
 
         element
+    }
+}
+
+impl Bounded for SvgCircle {
+    fn bound(&self) -> Option<Bound> {
+        let offset = V2::new(self.radius, self.radius);
+        Some(Bound {
+            low: self.pos - offset,
+            high: self.pos + offset,
+        })
     }
 }
 
@@ -366,8 +397,12 @@ impl SvgRect {
         self.pos = center - self.size / 2.;
         self
     }
+}
 
-    pub fn finalize(self) -> Rectangle {
+impl ToSvg for SvgRect {
+    type Output = Rectangle;
+
+    fn finalize(self) -> Self::Output {
         let mut element = Rectangle::new()
             .set("x", self.pos.x)
             .set("y", self.pos.y)
@@ -393,25 +428,37 @@ impl SvgRect {
     }
 }
 
+impl Bounded for SvgRect {
+    fn bound(&self) -> Option<Bound> {
+        Some(Bound {
+            low: self.pos,
+            high: self.pos + self.size,
+        })
+    }
+}
+
 impl SvgGroup {
     pub fn new() -> SvgGroup {
         SvgGroup {
             group: Group::new(),
-            bound: Bound::new(),
+            bound: None,
             translation: None,
         }
     }
 
-    pub fn new_grid(contents: Vec<SvgGroup>, spacing_factor: f32) -> SvgGroup {
+    pub fn new_grid(
+        contents: Vec<SvgGroup>,
+        spacing_factor: f32,
+    ) -> Result<SvgGroup, Error> {
         let num_columns = (contents.len() as f32).sqrt() as usize;
         let mut group = SvgGroup::new();
         let mut column_bound = Bound::new();
         // for column in contents.chunks(num_columns) {
         for (i, mut sub_group) in contents.into_iter().enumerate() {
             sub_group
-                .translate_to(column_bound.relative_pos(0., spacing_factor));
+                .translate_to(column_bound.relative_pos(0., spacing_factor))?;
             column_bound = column_bound.union(sub_group.bound());
-            group.append_group(sub_group);
+            group.append(sub_group);
 
             if i % num_columns == num_columns - 1 {
                 column_bound = Bound::empty_at(
@@ -419,17 +466,20 @@ impl SvgGroup {
                 );
             }
         }
-        group
+        Ok(group)
     }
 
-    pub fn append_path(&mut self, path: SvgPath) {
-        self.bound = self.bound.union(path.bound());
-        self.group.append(path.finalize());
-    }
+    pub fn append<T>(&mut self, thing: T)
+    where
+        T: Bounded + ToSvg,
+    {
+        self.bound = if let Some(current_bound) = self.bound {
+            Some(current_bound.union(thing.bound()))
+        } else {
+            thing.bound()
+        };
 
-    pub fn append_group(&mut self, group: SvgGroup) {
-        self.bound = self.bound.union(group.bound);
-        self.group.append(group.finalize());
+        self.group.append(thing.finalize());
     }
 
     pub fn append_node<T>(&mut self, node: T)
@@ -441,27 +491,29 @@ impl SvgGroup {
         self.group.append(node)
     }
 
-    pub fn translate_to(&mut self, new_low: P2) {
+    pub fn translate_to(&mut self, new_low: P2) -> Result<(), Error> {
+        let bound = self.bound().ok_or_else(|| {
+            format_err!(
+                "Cannot translate group to a position because current bound is not known"
+            )
+        })?;
+
         let new_low = new_low * SCALE;
-        let trans_vec = new_low - self.bound().low;
+        let trans_vec = new_low - bound.low;
 
         self.translation = if let Some(current) = self.translation {
             Some(current + trans_vec)
         } else {
             Some(trans_vec)
         };
+        Ok(())
     }
+}
 
-    pub fn bound(&self) -> Bound {
-        let bound = self.bound;
-        if let Some(trans_vec) = self.translation {
-            bound.translate(trans_vec)
-        } else {
-            bound
-        }
-    }
+impl ToSvg for SvgGroup {
+    type Output = Group;
 
-    pub fn finalize(self) -> Group {
+    fn finalize(self) -> Self::Output {
         let mut group = self.group;
         if let Some(trans_vec) = self.translation {
             group.assign(
@@ -470,6 +522,20 @@ impl SvgGroup {
             );
         }
         group
+    }
+}
+
+impl Bounded for SvgGroup {
+    fn bound(&self) -> Option<Bound> {
+        if let Some(bound) = self.bound {
+            if let Some(trans_vec) = self.translation {
+                Some(bound.translate(trans_vec))
+            } else {
+                Some(bound)
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -500,7 +566,7 @@ impl Bound {
         self.high.x - self.low.x
     }
 
-    fn height(&self) -> f32 {
+    pub fn height(&self) -> f32 {
         self.high.y - self.low.y
     }
 
@@ -531,48 +597,62 @@ impl Bound {
         }
     }
 
-    pub fn union(&self, other: Bound) -> Bound {
-        Bound {
-            low: P2::new(
-                self.low.x.min(other.low.x),
-                self.low.y.min(other.low.y),
-            ),
-            high: P2::new(
-                self.high.x.max(other.high.x),
-                self.high.y.max(other.high.y),
-            ),
-        }
-    }
-
-    pub fn intersect(&self, other: Bound) -> Option<Bound> {
-        let low =
-            P2::new(self.low.x.max(other.low.x), self.low.y.max(other.low.y));
-        let high = P2::new(
-            self.high.x.min(other.high.x),
-            self.high.y.min(other.high.y),
-        );
-        if low.x < high.x && low.y < high.y {
-            Some(Bound {
-                low: low,
-                high: high,
-            })
+    pub fn union(&self, other: Option<Bound>) -> Bound {
+        if let Some(other) = other {
+            Bound {
+                low: P2::new(
+                    self.low.x.min(other.low.x),
+                    self.low.y.min(other.low.y),
+                ),
+                high: P2::new(
+                    self.high.x.max(other.high.x),
+                    self.high.y.max(other.high.y),
+                ),
+            }
         } else {
-            None
+            *self
         }
     }
 
-    pub fn union_all(bounds: &[Bound]) -> Bound {
-        let mut bounds = bounds.iter();
-        let mut answer: Bound = *bounds.next().expect("no bounds to union");
+    pub fn intersect(&self, other: Option<Bound>) -> Option<Bound> {
+        if let Some(other) = other {
+            let low = P2::new(
+                self.low.x.max(other.low.x),
+                self.low.y.max(other.low.y),
+            );
+            let high = P2::new(
+                self.high.x.min(other.high.x),
+                self.high.y.min(other.high.y),
+            );
+
+            if low.x < high.x && low.y < high.y {
+                Some(Bound {
+                    low: low,
+                    high: high,
+                })
+            } else {
+                None
+            }
+        } else {
+            Some(*self)
+        }
+    }
+
+    pub fn union_all(bounds: &[Option<Bound>]) -> Bound {
+        // ignore missing bounds (None), unwrap the rest
+        let mut bounds = bounds.into_iter().skip_while(|b| b.is_none());
+        let mut answer: Bound =
+            bounds.next().expect("no bounds to union").unwrap();
         for b in bounds {
             answer = answer.union(*b);
         }
         answer
     }
 
-    pub fn intersect_all(bounds: &[Bound]) -> Option<Bound> {
-        let mut bounds = bounds.iter();
-        let mut answer = *bounds.next().expect("no bounds to intersect");
+    pub fn intersect_all(bounds: &[Option<Bound>]) -> Option<Bound> {
+        let mut bounds = bounds.into_iter().skip_while(|b| b.is_none());
+        let mut answer: Bound =
+            bounds.next().expect("no bounds to intersect").unwrap();
         for b in bounds {
             answer = answer.intersect(*b)?;
         }
@@ -587,29 +667,6 @@ impl Bound {
 }
 
 impl SvgText {
-    pub fn finalize(self) -> Group {
-        let mut g = Group::new();
-        let mut y = self.pos.y - self.total_height() / 2.;
-        let line_height = self.line_height();
-        for line in self.lines {
-            let text = Text::new()
-                .set("x", self.pos.x)
-                .set("y", y)
-                .set("font-size", self.size)
-                .set("font-style", "normal")
-                .set("font-weight",  "bold")
-                .set("font-family",  "sans-serif")
-                .set("dominant-baseline", "central") // center vertically
-                .set("text-anchor", "middle") // center horizontally
-                .set("fill", self.color)
-                .add(node::Text::new(line.to_owned()));
-
-            g.append(text);
-            y += line_height;
-        }
-        g
-    }
-
     fn line_height(&self) -> f32 {
         // self.size * 1.1
         self.size
@@ -617,6 +674,33 @@ impl SvgText {
 
     fn total_height(&self) -> f32 {
         self.line_height() * ((self.lines.len() as f32) - 1.)
+    }
+}
+
+impl ToSvg for SvgText {
+    type Output = Group;
+
+    fn finalize(self) -> Self::Output {
+        let mut g = Group::new();
+        let mut y = self.pos.y - self.total_height() / 2.;
+        let line_height = self.line_height();
+        for line in self.lines {
+            let text = Text::new()
+            .set("x", self.pos.x)
+            .set("y", y)
+            .set("font-size", self.size)
+            .set("font-style", "normal")
+            .set("font-weight",  "bold")
+            .set("font-family",  "sans-serif")
+            .set("dominant-baseline", "central") // center vertically
+            .set("text-anchor", "middle") // center horizontally
+            .set("fill", self.color)
+            .add(node::Text::new(line.to_owned()));
+
+            g.append(text);
+            y += line_height;
+        }
+        g
     }
 }
 

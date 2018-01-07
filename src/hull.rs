@@ -10,11 +10,9 @@ use spec::{BreadthLine, HeightLine, PlankStation, Planks, Spec};
 use spline::Spline;
 use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
-use render_2d::{Bound, PathStyle2, SvgCircle, SvgColor, SvgDoc, SvgGroup,
-                SvgPath};
+use render_2d::{Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
+                SvgGroup, SvgPath, SvgText, ToSvg};
 use util::project_points;
-// use svg::Node;
-// use svg::node::element::Group;
 
 /// A ship's hull.
 #[derive(MinMaxCoord)]
@@ -359,51 +357,46 @@ impl Hull {
             intersection.relative_pos(0.5, 0.66),
         ];
 
-        let make_holes = || -> Result<SvgGroup, Error> {
-            // This is to work around the fact that SvgGroup cannot be cloned,
-            // because svg library types can't be. Recreate the group everytime,
-            // instead.
-            let mut holes = SvgGroup::new();
-            for &pos in &hole_positions {
-                let hole = SvgCircle::new(pos, HOLE_DIAMETER / 2.)
-                    .stroke(SvgColor::Black, STROKE);
-                if !intersection.contains(&hole.bound()) {
-                    bail!("hole doesn't fit in overlap between cross-sections");
-                }
-                holes.append_node(hole.finalize())
+        let mut holes = SvgGroup::new();
+        for pos in hole_positions {
+            let hole = SvgCircle::new(pos, HOLE_DIAMETER / 2.)
+                .stroke(SvgColor::Black, STROKE);
+            if !intersection.contains(&hole.bound().unwrap()) {
+                bail!("hole doesn't fit in overlap between cross-sections");
             }
-            Ok(holes)
-        };
+            holes.append(hole)
+        }
 
         let mut groups = Vec::new();
-        for (_name, mut path) in paths {
+        for (name, mut path) in paths {
             // Add tab to each cross-section, for mounting it into a jig
             // let mut path = path.to_owned();
-            let tab_length = V2::new(0.75 * path.bound().width(), 0.);
-            let tab_center = P2::new(path.bound().center().x, 1.2 * max_y);
+            let bound = path.bound().expect("path has no bound");
+            let tab_length = V2::new(0.75 * bound.width(), 0.);
+            let tab_center = P2::new(bound.center().x, 1.2 * max_y);
             path.append(vec![
                 tab_center - tab_length / 2.,
                 tab_center + tab_length / 2.,
             ]);
 
-            // // TODO Add text label with name of cross-section
-            // let label = SvgText {
-            //     lines: vec![name.into()],
-            //     pos: path.bound().center(),
-            //     color: SvgColor::Black,
-            //     size: 0.2,
-            // }
+            // Add text label with name of cross-section
+            let holes_bound = holes.bound().unwrap();
+            let label = SvgText {
+                lines: vec![name.into()],
+                pos: holes_bound.center(),
+                color: SvgColor::Black,
+                size: 0.9 * (holes_bound.height() - 2. * HOLE_DIAMETER),
+            };
 
             let mut group = SvgGroup::new();
-            group.append_path(path.to_owned());
+            group.append(path);
+            group.append_node(label.finalize());
 
-            let holes = make_holes()?;
-            group.append_group(holes);
-            // TODO letters
+            group.append(holes.clone());
             groups.push(group);
         }
         let mut doc = SvgDoc::new();
-        doc.append_group(SvgGroup::new_grid(groups, 1.1));
+        doc.append(SvgGroup::new_grid(groups, 1.1)?);
         Ok(doc)
     }
 
@@ -468,8 +461,8 @@ impl Station {
 
     fn get_cross_section_path(&self) -> SvgPath {
         // Draw right and left halves of cross-section
-        let mut points: Vec<_> = self.spline.sample(None)
-            .into_iter().rev().collect();
+        let mut points: Vec<_> =
+            self.spline.sample(None).into_iter().rev().collect();
         let left = reflect3(Axis::Y, &points);
         points.extend(left.iter().rev());
         SvgPath::new(project_points(Axis::X, &points))
