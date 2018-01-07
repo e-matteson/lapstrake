@@ -397,7 +397,7 @@ impl Hull {
         }
         let mut doc = SvgDoc::new();
         let grid = SvgGroup::new_grid(groups, 1.1)?;
-        grid.finalize_to_doc(&mut doc);
+        doc.append(grid);
         Ok(doc)
     }
 
