@@ -18,18 +18,21 @@ use svg::node::Value;
 use svg::node::element::{Circle, Group, Path, Rectangle, Text};
 use svg::node::element::path::Data;
 
-// const SCALE: f32 = 96.; // pixels per inch
-const SCALE: f32 = 1.; // pixels per inch
-
-#[derive(Clone, Copy, Debug)]
-pub enum PathStyle2 {
-    Dots,
-    Line,
-    LineWithDots,
-}
+/// The PPI is not entirely standardized between svg rendering programs.
+/// Inkscape currently use 96, but Inkscape version 0.91 and before used 90. In
+/// Illustrator, it's adjustable. If the svg program assumes a different PPI
+/// than what is used here, the scale will be wrong. TODO add scale bar.
+const PIXELS_PER_INCH: f32 = 96.; // pixels per inch
 
 pub struct SvgDoc {
     contents: SvgGroup,
+}
+
+#[derive(Clone)]
+pub struct SvgGroup {
+    contents: Vec<Box<ToSvg>>,
+    bound: Option<Bound>,
+    translation: Option<V2>,
 }
 
 #[derive(Clone, Debug)]
@@ -38,6 +41,13 @@ pub struct SvgPath {
     stroke: Stroke,
     style: PathStyle2,
     is_closed: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PathStyle2 {
+    Dots,
+    Line,
+    LineWithDots,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -57,17 +67,12 @@ pub struct SvgRect {
     fillet: Option<V2>,
 }
 
-#[derive(Clone)]
-pub struct SvgGroup {
-    contents: Vec<Box<ToSvg>>,
-    bound: Option<Bound>,
-    translation: Option<V2>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Bound {
-    pub low: P2,
-    pub high: P2,
+#[derive(Clone, Debug)]
+pub struct SvgText {
+    pub lines: Vec<String>,
+    pub pos: P2,
+    pub color: SvgColor,
+    pub size: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -91,12 +96,10 @@ pub enum SvgColor {
     DarkGrey,
 }
 
-#[derive(Clone, Debug)]
-pub struct SvgText {
-    pub lines: Vec<String>,
-    pub pos: P2,
-    pub color: SvgColor,
-    pub size: f32,
+#[derive(Clone, Copy, Debug)]
+pub struct Bound {
+    pub low: P2,
+    pub high: P2,
 }
 
 pub trait Bounded {
@@ -104,7 +107,7 @@ pub trait Bounded {
 }
 
 pub trait ToSvg: 'static + CloneToSvg {
-    fn finalize_to(&self, group: &mut Group);
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32);
 }
 
 #[doc(hidden)]
@@ -150,21 +153,25 @@ impl SvgDoc {
         }
     }
 
-    pub fn save(self, filename: &str) -> Result<(), Error> {
+    pub fn save(
+        self,
+        filename: &str,
+        scale_from_feet: f32,
+    ) -> Result<(), Error> {
         println!("Saving svg file {}.", filename);
-        Ok(svg::save(filename, &self.finalize())?)
+        Ok(svg::save(filename, &self.finalize(scale_from_feet))?)
     }
 
-    fn finalize(self) -> Document {
+    fn finalize(self, scale_from_feet: f32) -> Document {
         let mut doc = Document::new();
         let mut group = Group::new();
         if let Some(bound) = self.bound() {
             let background =
                 SvgRect::new(bound.low, bound.size()).fill(SvgColor::White);
-            background.finalize_to(&mut group);
-            doc.assign("viewBox", bound.view_box());
+            background.finalize_to(&mut group, scale_from_feet);
+            doc.assign("viewBox", bound.view_box(scale_from_feet));
         }
-        self.contents.finalize_to(&mut group);
+        self.contents.finalize_to(&mut group, scale_from_feet);
         doc.append(group);
         doc
     }
@@ -176,13 +183,116 @@ impl Bounded for SvgDoc {
     }
 }
 
+impl SvgGroup {
+    pub fn new() -> SvgGroup {
+        SvgGroup {
+            contents: Vec::new(),
+            bound: None,
+            translation: None,
+        }
+    }
+
+    pub fn new_grid(
+        contents: Vec<SvgGroup>,
+        spacing_factor: f32,
+    ) -> Result<SvgGroup, Error> {
+        let num_columns = (contents.len() as f32).sqrt() as usize;
+        let mut group = SvgGroup::new();
+        let mut column_bound = Bound::new();
+        for (i, mut sub_group) in contents.into_iter().enumerate() {
+            sub_group
+                .translate_to(column_bound.relative_pos(0., spacing_factor))?;
+            column_bound = column_bound.union(sub_group.bound());
+            group.append(sub_group);
+
+            if i % num_columns == num_columns - 1 {
+                column_bound = Bound::empty_at(
+                    column_bound.relative_pos(spacing_factor, 0.),
+                );
+            }
+        }
+        Ok(group)
+    }
+
+    pub fn append<T>(&mut self, thing: T)
+    where
+        T: Bounded + ToSvg,
+    {
+        self.bound = if let Some(current_bound) = self.bound {
+            Some(current_bound.union(thing.bound()))
+        } else {
+            thing.bound()
+        };
+
+        // thing.finalize_to(&mut self.contents);
+        self.contents.push(Box::new(thing));
+    }
+
+    pub fn translate_to(&mut self, new_low: P2) -> Result<(), Error> {
+        let bound = self.bound().ok_or_else(|| {
+            format_err!(
+                "Cannot translate group to a position because current bound is not known"
+            )
+        })?;
+
+        let trans_vec = new_low - bound.low;
+
+        self.translation = if let Some(current) = self.translation {
+            Some(current + trans_vec)
+        } else {
+            Some(trans_vec)
+        };
+        Ok(())
+    }
+
+    fn finalize(&self, scale_from_feet: f32) -> Group {
+        let scale = scale(scale_from_feet);
+
+        let mut group = Group::new();
+        for item in &self.contents {
+            item.finalize_to(&mut group, scale_from_feet);
+        }
+        if let Some(trans_vec) = self.translation {
+            group.assign(
+                "transform",
+                format!(
+                    "translate({},{})",
+                    trans_vec.x * scale,
+                    trans_vec.y * scale
+                ),
+            );
+        }
+        group
+    }
+}
+
+impl ToSvg for SvgGroup {
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32) {
+        group.append(self.finalize(scale_from_feet));
+    }
+}
+
+impl Bounded for SvgGroup {
+    fn bound(&self) -> Option<Bound> {
+        if let Some(bound) = self.bound {
+            if let Some(trans_vec) = self.translation {
+                Some(bound.translate(trans_vec))
+            } else {
+                Some(bound)
+            }
+        } else {
+            None
+        }
+    }
+}
+
 impl SvgPath {
     pub fn new(points: Vec<P2>) -> SvgPath {
         SvgPath {
-            points: points.into_iter().map(|p| SCALE * p).collect(),
+            points: points,
             stroke: Stroke {
                 color: SvgColor::Black,
-                width: 1. * SCALE,
+                width: 1.,
             },
             style: PathStyle2::Line,
             is_closed: false,
@@ -196,7 +306,7 @@ impl SvgPath {
     pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
         self.stroke = Stroke {
             color: color,
-            width: width * SCALE,
+            width: width,
         };
         self
     }
@@ -212,37 +322,39 @@ impl SvgPath {
     }
 
     pub fn append(&mut self, new_points: Vec<P2>) {
-        self.points
-            .extend(new_points.into_iter().map(|p| SCALE * p))
+        self.points.extend(new_points)
     }
 
-    pub fn save(self, filename: &str) -> Result<(), Error> {
+    pub fn save(
+        self,
+        filename: &str,
+        scale_from_feet: f32,
+    ) -> Result<(), Error> {
         let mut doc = SvgDoc::new();
         doc.append(self);
-        doc.save(filename)?;
+        doc.save(filename, scale_from_feet)?;
         Ok(())
     }
 
-    fn dots(&self) -> Group {
+    fn dots(&self) -> SvgGroup {
         let radius = self.stroke.width;
         let color = self.stroke.color;
 
-        let mut group = Group::new();
+        let mut group = SvgGroup::new();
         for p in &self.points {
-            SvgCircle::new(p.to_owned(), radius)
-                .fill(color)
-                .finalize_to(&mut group);
+            group.append(SvgCircle::new(p.to_owned(), radius).fill(color));
         }
         group
     }
 
-    fn path_data(&self) -> Data {
+    fn path_data(&self, scale_from_feet: f32) -> Data {
+        let scale = scale(scale_from_feet);
         let mut data = Data::new();
-        let mut points = self.points.iter();
+        let mut points = self.points.iter().map(|p| p * scale);
         let first = points.next().expect("path is empty");
-        data = data.move_to(to_tuple(first));
+        data = data.move_to(to_tuple(&first));
         for p in points {
-            data = data.line_to(to_tuple(p));
+            data = data.line_to(to_tuple(&p));
         }
         if self.is_closed {
             data = data.close();
@@ -252,18 +364,19 @@ impl SvgPath {
 }
 
 impl ToSvg for SvgPath {
-    fn finalize_to(&self, group: &mut Group) {
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32) {
+        let scale = scale(scale_from_feet);
         if self.style.has_line() {
             let mut path = Path::new();
-            path.assign("d", self.path_data());
+            path.assign("d", self.path_data(scale_from_feet));
             path.assign("stroke", self.stroke.color);
-            path.assign("stroke-width", self.stroke.width);
+            path.assign("stroke-width", self.stroke.width * scale);
             path.assign("fill", "none");
             group.append(path);
         }
 
         if self.style.has_dots() {
-            group.append(self.dots())
+            group.append(self.dots().finalize(scale_from_feet));
         }
     }
 }
@@ -305,8 +418,8 @@ impl PathStyle2 {
 impl SvgCircle {
     pub fn new(pos: P2, radius: f32) -> Self {
         Self {
-            pos: pos * SCALE,
-            radius: radius * SCALE,
+            pos: pos,
+            radius: radius,
             stroke: None,
             fill: None,
         }
@@ -315,7 +428,7 @@ impl SvgCircle {
     pub fn stroke(mut self, color: SvgColor, width: f32) -> Self {
         self.stroke = Some(Stroke {
             color: color,
-            width: width * SCALE,
+            width: width,
         });
         self
     }
@@ -327,15 +440,16 @@ impl SvgCircle {
 }
 
 impl ToSvg for SvgCircle {
-    fn finalize_to(&self, group: &mut Group) {
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32) {
+        let scale = scale(scale_from_feet);
         let mut element = Circle::new()
-            .set("cx", self.pos.x)
-            .set("cy", self.pos.y)
-            .set("r", self.radius);
+            .set("cx", self.pos.x * scale)
+            .set("cy", self.pos.y * scale)
+            .set("r", self.radius * scale);
 
         if let Some(stroke) = self.stroke {
             element.assign("stroke", stroke.color);
-            element.assign("stroke-width", stroke.width);
+            element.assign("stroke-width", stroke.width * scale);
         }
 
         if let Some(color) = self.fill {
@@ -361,8 +475,8 @@ impl Bounded for SvgCircle {
 impl SvgRect {
     pub fn new(pos: P2, size: V2) -> Self {
         Self {
-            pos: pos * SCALE,
-            size: size * SCALE,
+            pos: pos,
+            size: size,
             stroke: None,
             fill: None,
             fillet: None,
@@ -383,7 +497,6 @@ impl SvgRect {
     }
 
     pub fn fillet(mut self, radius: f32) -> Self {
-        let radius = radius * SCALE;
         assert!(radius >= 0.);
         self.fillet = Some(V2::new(radius, radius));
         self
@@ -403,16 +516,17 @@ impl SvgRect {
 }
 
 impl ToSvg for SvgRect {
-    fn finalize_to(&self, group: &mut Group) {
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32) {
+        let scale = scale(scale_from_feet);
         let mut element = Rectangle::new()
-            .set("x", self.pos.x)
-            .set("y", self.pos.y)
-            .set("width", self.size.x)
-            .set("height", self.size.y);
+            .set("x", self.pos.x * scale)
+            .set("y", self.pos.y * scale)
+            .set("width", self.size.x * scale)
+            .set("height", self.size.y * scale);
 
         if let Some(stroke) = self.stroke {
             element.assign("stroke", stroke.color);
-            element.assign("stroke-width", stroke.width);
+            element.assign("stroke-width", stroke.width * scale);
         }
 
         if let Some(color) = self.fill {
@@ -422,8 +536,8 @@ impl ToSvg for SvgRect {
         }
 
         if let Some(fillet) = self.fillet {
-            element.assign("rx", fillet.x);
-            element.assign("ry", fillet.y);
+            element.assign("rx", fillet.x * scale);
+            element.assign("ry", fillet.y * scale);
         }
         group.append(element);
     }
@@ -438,114 +552,46 @@ impl Bounded for SvgRect {
     }
 }
 
-impl SvgGroup {
-    pub fn new() -> SvgGroup {
-        SvgGroup {
-            contents: Vec::new(),
-            bound: None,
-            translation: None,
-        }
+impl SvgText {
+    fn line_height(&self) -> f32 {
+        self.size
     }
 
-    pub fn new_grid(
-        contents: Vec<SvgGroup>,
-        spacing_factor: f32,
-    ) -> Result<SvgGroup, Error> {
-        let num_columns = (contents.len() as f32).sqrt() as usize;
-        let mut group = SvgGroup::new();
-        let mut column_bound = Bound::new();
-        // for column in contents.chunks(num_columns) {
-        for (i, mut sub_group) in contents.into_iter().enumerate() {
-            sub_group
-                .translate_to(column_bound.relative_pos(0., spacing_factor))?;
-            column_bound = column_bound.union(sub_group.bound());
-            group.append(sub_group);
-
-            if i % num_columns == num_columns - 1 {
-                column_bound = Bound::empty_at(
-                    column_bound.relative_pos(spacing_factor, 0.),
-                );
-            }
-        }
-        Ok(group)
-    }
-
-    pub fn append<T>(&mut self, thing: T)
-    where
-        T: Bounded + ToSvg,
-    {
-        self.bound = if let Some(current_bound) = self.bound {
-            Some(current_bound.union(thing.bound()))
-        } else {
-            thing.bound()
-        };
-
-        // thing.finalize_to(&mut self.contents);
-        self.contents.push(Box::new(thing));
-    }
-
-    // pub fn append_node<T>(&mut self, node: T)
-    // where
-    //     T: Node,
-    // {
-    //     // This can't update the bounding box, because the node's size isn't
-    //     // known. You're on your own.
-    //     self.contents.append(node)
-    // }
-
-    pub fn translate_to(&mut self, new_low: P2) -> Result<(), Error> {
-        let bound = self.bound().ok_or_else(|| {
-            format_err!(
-                "Cannot translate group to a position because current bound is not known"
-            )
-        })?;
-
-        let new_low = new_low * SCALE;
-        let trans_vec = new_low - bound.low;
-
-        self.translation = if let Some(current) = self.translation {
-            Some(current + trans_vec)
-        } else {
-            Some(trans_vec)
-        };
-        Ok(())
-    }
-
-    fn finalize(&self) -> Group {
-        let mut group = Group::new();
-        for item in &self.contents {
-            item.finalize_to(&mut group);
-        }
-        if let Some(trans_vec) = self.translation {
-            group.assign(
-                "transform",
-                format!("translate({},{})", trans_vec.x, trans_vec.y),
-            );
-        }
-        group
+    fn total_height(&self) -> f32 {
+        self.line_height() * ((self.lines.len() as f32) - 1.)
     }
 }
 
-impl ToSvg for SvgGroup {
-    fn finalize_to(&self, group: &mut Group) {
-        group.append(self.finalize());
+impl ToSvg for SvgText {
+    fn finalize_to(&self, group: &mut Group, scale_from_feet: f32) {
+        let scale = scale(scale_from_feet);
+        let mut y = (self.pos.y - self.total_height() / 2.) * scale;
+        let line_height = self.line_height() * scale;
+        for line in &self.lines {
+            let text = Text::new()
+                .set("x", self.pos.x * scale)
+            .set("y", y)
+            .set("font-size", self.size * scale)
+            .set("font-style", "normal")
+            .set("font-weight",  "bold")
+            .set("font-family",  "sans-serif")
+            .set("dominant-baseline", "central") // center vertically
+            .set("text-anchor", "middle") // center horizontally
+            .set("fill", self.color)
+            .add(node::Text::new(line.to_owned()));
+
+            group.append(text);
+            y += line_height;
+        }
     }
 }
 
-impl Bounded for SvgGroup {
+impl Bounded for SvgText {
     fn bound(&self) -> Option<Bound> {
-        if let Some(bound) = self.bound {
-            if let Some(trans_vec) = self.translation {
-                Some(bound.translate(trans_vec))
-            } else {
-                Some(bound)
-            }
-        } else {
-            None
-        }
+        // We don't know how big text is, because rendering it is complicated :(
+        None
     }
 }
-
 impl Bound {
     pub fn new() -> Bound {
         Bound::from_origin(0., 0.)
@@ -553,20 +599,26 @@ impl Bound {
 
     pub fn empty_at(pos: P2) -> Bound {
         Bound {
-            low: pos * SCALE,
-            high: pos * SCALE,
+            low: pos,
+            high: pos,
         }
     }
 
     fn from_origin(width: f32, height: f32) -> Bound {
         Bound {
             low: P2::origin(),
-            high: P2::new(width * SCALE, height * SCALE),
+            high: P2::new(width, height),
         }
     }
 
-    fn view_box(&self) -> (f32, f32, f32, f32) {
-        (self.low.x, self.low.y, self.width(), self.height())
+    fn view_box(&self, scale_from_feet: f32) -> (f32, f32, f32, f32) {
+        let scale = scale(scale_from_feet);
+        (
+            self.low.x * scale,
+            self.low.y * scale,
+            self.width() * scale,
+            self.height(),
+        )
     }
 
     pub fn width(&self) -> f32 {
@@ -673,47 +725,6 @@ impl Bound {
     }
 }
 
-impl SvgText {
-    fn line_height(&self) -> f32 {
-        // self.size * 1.1
-        self.size
-    }
-
-    fn total_height(&self) -> f32 {
-        self.line_height() * ((self.lines.len() as f32) - 1.)
-    }
-}
-
-impl ToSvg for SvgText {
-    fn finalize_to(&self, group: &mut Group) {
-        let mut y = self.pos.y - self.total_height() / 2.;
-        let line_height = self.line_height();
-        for line in &self.lines {
-            let text = Text::new()
-            .set("x", self.pos.x)
-            .set("y", y)
-            .set("font-size", self.size)
-            .set("font-style", "normal")
-            .set("font-weight",  "bold")
-            .set("font-family",  "sans-serif")
-            .set("dominant-baseline", "central") // center vertically
-            .set("text-anchor", "middle") // center horizontally
-            .set("fill", self.color)
-            .add(node::Text::new(line.to_owned()));
-
-            group.append(text);
-            y += line_height;
-        }
-    }
-}
-
-impl Bounded for SvgText {
-    fn bound(&self) -> Option<Bound> {
-        // We don't know how big text is, because rendering it is complicated :(
-        None
-    }
-}
-
 // #[test]
 // fn test_svg() {
 //     let data = Data::new()
@@ -758,4 +769,8 @@ impl Into<Value> for SvgColor {
 
 fn to_tuple(pos: &P2) -> (f32, f32) {
     (pos.x, pos.y)
+}
+
+fn scale(scale_from_feet: f32) -> f32 {
+    scale_from_feet * 12. * PIXELS_PER_INCH
 }
