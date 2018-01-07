@@ -11,7 +11,7 @@ use spline::Spline;
 use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
-                SvgGroup, SvgPath, SvgText, ToSvg};
+                SvgGroup, SvgPath, SvgText};
 use util::project_points;
 
 /// A ship's hull.
@@ -390,13 +390,14 @@ impl Hull {
 
             let mut group = SvgGroup::new();
             group.append(path);
-            group.append_node(label.finalize());
-
+            group.append(label);
             group.append(holes.clone());
+
             groups.push(group);
         }
         let mut doc = SvgDoc::new();
-        doc.append(SvgGroup::new_grid(groups, 1.1)?);
+        let grid = SvgGroup::new_grid(groups, 1.1)?;
+        grid.finalize_to_doc(&mut doc);
         Ok(doc)
     }
 

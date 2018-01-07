@@ -60,7 +60,7 @@ pub struct SvgRect {
 
 #[derive(Clone)]
 pub struct SvgGroup {
-    group: Group,
+    contents: Group, //TODO use vec box
     bound: Option<Bound>,
     translation: Option<V2>,
 }
@@ -105,8 +105,7 @@ pub trait Bounded {
 }
 
 pub trait ToSvg {
-    type Output: Node;
-    fn finalize(self) -> Self::Output;
+    fn finalize_to(self, group: &mut Group);
 }
 
 impl SvgDoc {
@@ -143,20 +142,19 @@ impl SvgDoc {
         println!("Saving svg file {}.", filename);
         Ok(svg::save(filename, &self.finalize())?)
     }
-}
 
-impl ToSvg for SvgDoc {
-    type Output = Document;
-
-    fn finalize(self) -> Self::Output {
+    fn finalize(self) -> Document {
+        let mut group = Group::new();
         let mut doc = Document::new();
         if let Some(bound) = self.bound() {
             let background =
                 SvgRect::new(bound.low, bound.size()).fill(SvgColor::White);
-            doc.append(background.finalize());
+            background.finalize_to(&mut group);
             doc.assign("viewBox", bound.view_box());
         }
-        doc.append(self.contents.finalize());
+        self.contents.finalize_to(&mut group);
+        // group.finalize_to_doc(&mut doc);
+        doc.append(group);
         doc
     }
 }
@@ -220,9 +218,9 @@ impl SvgPath {
 
         let mut group = Group::new();
         for p in &self.points {
-            group.append(
-                SvgCircle::new(p.to_owned(), radius).fill(color).finalize(),
-            );
+            SvgCircle::new(p.to_owned(), radius)
+                .fill(color)
+                .finalize_to(&mut group);
         }
         group
     }
@@ -243,10 +241,7 @@ impl SvgPath {
 }
 
 impl ToSvg for SvgPath {
-    type Output = Group;
-
-    fn finalize(self) -> Self::Output {
-        let mut group = Group::new();
+    fn finalize_to(self, group: &mut Group) {
         if self.style.has_line() {
             let mut path = Path::new();
             path.assign("d", self.path_data());
@@ -259,7 +254,6 @@ impl ToSvg for SvgPath {
         if self.style.has_dots() {
             group.append(self.dots())
         }
-        group
     }
 }
 
@@ -322,9 +316,7 @@ impl SvgCircle {
 }
 
 impl ToSvg for SvgCircle {
-    type Output = Circle;
-
-    fn finalize(self) -> Self::Output {
+    fn finalize_to(self, group: &mut Group) {
         let mut element = Circle::new()
             .set("cx", self.pos.x)
             .set("cy", self.pos.y)
@@ -341,7 +333,7 @@ impl ToSvg for SvgCircle {
             element.assign("fill", "none");
         }
 
-        element
+        group.append(element);
     }
 }
 
@@ -400,9 +392,7 @@ impl SvgRect {
 }
 
 impl ToSvg for SvgRect {
-    type Output = Rectangle;
-
-    fn finalize(self) -> Self::Output {
+    fn finalize_to(self, group: &mut Group) {
         let mut element = Rectangle::new()
             .set("x", self.pos.x)
             .set("y", self.pos.y)
@@ -424,7 +414,7 @@ impl ToSvg for SvgRect {
             element.assign("rx", fillet.x);
             element.assign("ry", fillet.y);
         }
-        element
+        group.append(element);
     }
 }
 
@@ -440,7 +430,7 @@ impl Bounded for SvgRect {
 impl SvgGroup {
     pub fn new() -> SvgGroup {
         SvgGroup {
-            group: Group::new(),
+            contents: Group::new(),
             bound: None,
             translation: None,
         }
@@ -479,7 +469,7 @@ impl SvgGroup {
             thing.bound()
         };
 
-        self.group.append(thing.finalize());
+        thing.finalize_to(&mut self.contents);
     }
 
     pub fn append_node<T>(&mut self, node: T)
@@ -488,7 +478,7 @@ impl SvgGroup {
     {
         // This can't update the bounding box, because the node's size isn't
         // known. You're on your own.
-        self.group.append(node)
+        self.contents.append(node)
     }
 
     pub fn translate_to(&mut self, new_low: P2) -> Result<(), Error> {
@@ -508,20 +498,26 @@ impl SvgGroup {
         };
         Ok(())
     }
-}
 
-impl ToSvg for SvgGroup {
-    type Output = Group;
-
-    fn finalize(self) -> Self::Output {
-        let mut group = self.group;
+    fn finalize(self) -> Group {
+        let mut contents = self.contents;
         if let Some(trans_vec) = self.translation {
-            group.assign(
+            contents.assign(
                 "transform",
                 format!("translate({},{})", trans_vec.x, trans_vec.y),
             );
         }
-        group
+        contents
+    }
+
+    pub fn finalize_to_doc(self, doc: &mut SvgDoc) {
+        doc.append_node(self.finalize());
+    }
+}
+
+impl ToSvg for SvgGroup {
+    fn finalize_to(self, group: &mut Group) {
+        group.append(self.finalize());
     }
 }
 
@@ -678,10 +674,7 @@ impl SvgText {
 }
 
 impl ToSvg for SvgText {
-    type Output = Group;
-
-    fn finalize(self) -> Self::Output {
-        let mut g = Group::new();
+    fn finalize_to(self, group: &mut Group) {
         let mut y = self.pos.y - self.total_height() / 2.;
         let line_height = self.line_height();
         for line in self.lines {
@@ -697,10 +690,16 @@ impl ToSvg for SvgText {
             .set("fill", self.color)
             .add(node::Text::new(line.to_owned()));
 
-            g.append(text);
+            group.append(text);
             y += line_height;
         }
-        g
+    }
+}
+
+impl Bounded for SvgText {
+    fn bound(&self) -> Option<Bound> {
+        // We don't know how big text is, because rendering it is complicated :(
+        None
     }
 }
 
