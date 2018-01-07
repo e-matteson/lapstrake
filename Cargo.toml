@@ -5,8 +5,7 @@ authors = ["e-matteson <e.r.matteson@gmail.com>"]
 
 [dependencies]
 
-# svg = "*"
-svg = {git = "https://github.com/e-matteson/svg.git"}
+svg = "*"
 csv = "1.0.0-beta.5"
 failure = "*"
 nalgebra = "*"
