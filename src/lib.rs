@@ -19,6 +19,7 @@ mod load;
 mod catmullrom;
 mod util;
 mod spline;
+mod plank;
 mod hull;
 mod render_3d;
 
