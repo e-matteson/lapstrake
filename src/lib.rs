@@ -22,12 +22,14 @@ mod spline;
 mod plank;
 mod hull;
 mod render_3d;
+mod draw;
 
 pub use load::load_spec;
 pub use render_3d::view_3d;
 pub mod render_2d;
 pub use spec::*;
 pub use hull::*;
+pub use draw::*;
 
 use std::process;
 use failure::Error;

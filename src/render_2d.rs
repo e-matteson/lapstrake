@@ -169,6 +169,7 @@ impl SvgDoc {
             let background =
                 SvgRect::new(bound.low, bound.size()).fill(SvgColor::White);
             background.finalize_to(&mut group, scale_from_feet);
+            // doc.append(background);
             doc.assign("viewBox", bound.view_box(scale_from_feet));
         }
         self.contents.finalize_to(&mut group, scale_from_feet);
@@ -642,7 +643,7 @@ impl Bound {
             self.low.x * scale,
             self.low.y * scale,
             self.width() * scale,
-            self.height(),
+            self.height() * scale,
         )
     }
 
@@ -654,7 +655,7 @@ impl Bound {
         self.high.y - self.low.y
     }
 
-    fn size(&self) -> V2 {
+    pub fn size(&self) -> V2 {
         V2::new(self.width(), self.height())
     }
 
