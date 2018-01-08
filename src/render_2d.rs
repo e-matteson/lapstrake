@@ -194,20 +194,45 @@ impl SvgGroup {
 
     pub fn new_grid(
         contents: Vec<SvgGroup>,
-        spacing_factor: f32,
+        spacing: f32,
     ) -> Result<SvgGroup, Error> {
-        let num_columns = (contents.len() as f32).sqrt() as usize;
+        let num_rows = (contents.len() as f32).sqrt() as usize;
+        SvgGroup::grid_helper(contents, spacing, num_rows)
+    }
+
+    pub fn new_vertical(
+        contents: Vec<SvgGroup>,
+        spacing: f32,
+    ) -> Result<SvgGroup, Error> {
+        let num_rows = contents.len();
+        SvgGroup::grid_helper(contents, spacing, num_rows)
+    }
+
+    pub fn new_horizontal(
+        contents: Vec<SvgGroup>,
+        spacing: f32,
+    ) -> Result<SvgGroup, Error> {
+        SvgGroup::grid_helper(contents, spacing, 1)
+    }
+
+    fn grid_helper(
+        contents: Vec<SvgGroup>,
+        spacing: f32,
+        num_rows: usize,
+    ) -> Result<SvgGroup, Error> {
         let mut group = SvgGroup::new();
         let mut column_bound = Bound::new();
+        let y_spacing = V2::new(0., spacing);
+        let x_spacing = V2::new(spacing, 0.);
         for (i, mut sub_group) in contents.into_iter().enumerate() {
             sub_group
-                .translate_to(column_bound.relative_pos(0., spacing_factor))?;
+                .translate_to(column_bound.relative_pos(0., 1.) + y_spacing)?;
             column_bound = column_bound.union(sub_group.bound());
             group.append(sub_group);
 
-            if i % num_columns == num_columns - 1 {
+            if i % num_rows == num_rows - 1 {
                 column_bound = Bound::empty_at(
-                    column_bound.relative_pos(spacing_factor, 0.),
+                    column_bound.relative_pos(1., 0.) + x_spacing,
                 );
             }
         }
