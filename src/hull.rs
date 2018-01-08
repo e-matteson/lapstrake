@@ -10,7 +10,7 @@ use plank::{Plank, FlattenedPlank};
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
                 SvgGroup, SvgPath, SvgText, make_scale_bar};
-use util::project_points;
+
 
 /// A ship's hull.
 #[derive(MinMaxCoord)]
