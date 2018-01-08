@@ -11,7 +11,7 @@ use spline::Spline;
 use scad_dots::utils::distance;
 use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
 use render_2d::{Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
-                SvgGroup, SvgPath, SvgText};
+                SvgGroup, SvgPath, SvgText, make_scale_bar};
 use util::project_points;
 
 /// A ship's hull.
@@ -397,7 +397,8 @@ impl Hull {
         }
         let mut doc = SvgDoc::new();
         let grid = SvgGroup::new_grid(groups, 1.1)?;
-        doc.append(grid);
+        let stack = SvgGroup::new_vertical(vec![make_scale_bar()?, grid], 1.1)?;
+        doc.append(stack);
         Ok(doc)
     }
 

@@ -799,3 +799,51 @@ fn to_tuple(pos: &P2) -> (f32, f32) {
 fn scale(scale_from_feet: f32) -> f32 {
     scale_from_feet * 12. * PIXELS_PER_INCH
 }
+
+pub fn make_scale_bar() -> Result<SvgGroup, Error> {
+    let stroke = 0.05;
+    let short_length = 1.;
+    let long_length = 10.;
+    let cap_length = short_length / 10.;
+    let font_size = short_length / 4.;
+
+    let short = make_capped_line(short_length - stroke, cap_length)
+        .stroke(SvgColor::Black, stroke);
+
+    let long = make_capped_line(long_length - stroke, cap_length)
+        .stroke(SvgColor::Black, stroke);
+
+    let short_label = SvgText {
+        lines: vec!["1 ft".into()],
+        pos: short.bound().unwrap().center() + V2::new(0., font_size),
+        color: SvgColor::Black,
+        size: font_size,
+    };
+    let long_label = SvgText {
+        lines: vec!["10 ft".into()],
+        pos: long.bound().unwrap().center() + V2::new(0., font_size),
+        color: SvgColor::Black,
+        size: font_size,
+    };
+
+    let mut short_group = SvgGroup::new();
+    let mut long_group = SvgGroup::new();
+    short_group.append(short);
+    short_group.append(short_label);
+    long_group.append(long);
+    long_group.append(long_label);
+    SvgGroup::new_vertical(vec![long_group, short_group], cap_length)
+}
+
+fn make_capped_line(length: f32, cap_length: f32) -> SvgPath {
+    let pos = P2::origin();
+    let cap_offset = V2::new(0., cap_length);
+    let line_offset = V2::new(length, 0.);
+
+    SvgPath::new(vec![
+        pos + cap_offset,
+        pos,
+        pos + line_offset,
+        pos + line_offset + cap_offset,
+    ])
+}
