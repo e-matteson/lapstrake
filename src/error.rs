@@ -9,7 +9,7 @@ use scad_dots::errors::ScadDotsError;
 #[derive(Debug)]
 pub enum LapstrakeError {
     General(String),
-    Load,
+    Load(String),
     Spline,
     Draw,
     Model(ScadDotsError),
@@ -65,6 +65,10 @@ impl LapstrakeError {
     {
         self.context(&message_creator())
     }
+
+    pub fn load(message: &str) -> Self {
+        LapstrakeError::Load(message.to_owned())
+    }
 }
 
 impl Error for LapstrakeError {
@@ -99,8 +103,8 @@ impl From<csv::Error> for LapstrakeError {
 impl fmt::Display for LapstrakeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            LapstrakeError::Load => {
-                write!(f, "Failed to load ship specification")
+            LapstrakeError::Load(message) => {
+                write!(f, "Failed to load ship specifications:\n{}", message)
             }
             LapstrakeError::Draw => write!(f, "Failed to make 2d drawing"),
             LapstrakeError::Spline => write!(f, "Spline error"),

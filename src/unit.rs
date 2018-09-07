@@ -25,8 +25,9 @@ impl Feet {
     /// Parse Feet from a string, using the format 2-3-4.
     pub fn parse(text: &str) -> Result<Feet, LapstrakeError> {
         match Feet::parse_opt(text)? {
-            None => Err(LapstrakeError::Load
-                .context("this required measurement was omitted")),
+            None => Err(LapstrakeError::load(
+                "this required measurement was omitted",
+            )),
             Some(feet) => Ok(feet),
         }
     }
@@ -64,16 +65,18 @@ impl Feet {
                 eighths: Self::parse_usize(eighths_str)
                     .context("Invalid eighths.")?,
             }),
-            _ => Err(LapstrakeError::Load
-                .context("Didn't find exactly 3 parts in the measurement.")),
+            _ => Err(LapstrakeError::load(
+                "Didn't find exactly 3 parts in the measurement.",
+            )),
         }
     }
 
     fn parse_usize(text: &str) -> Result<u32, LapstrakeError> {
         u32::from_str(text).map_err(|_| {
-            LapstrakeError::Load.with_context(|| {
-                format!("Unable to read number in measurement: '{}'.", text)
-            })
+            LapstrakeError::Load(format!(
+                "Unable to read number in measurement: '{}'.",
+                text
+            ))
         })
     }
 }

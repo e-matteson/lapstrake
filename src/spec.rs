@@ -118,11 +118,9 @@ impl Spec {
                 }
             }
         }
-        Err(LapstrakeError::Load.with_context(|| {
-            format!(
-                "Could not find a measurement for {:?} at station index {}",
-                measurement, station_index
-            )
-        }))
+        Err(LapstrakeError::Load(format!(
+            "Could not find a measurement for {:?} at station index {}",
+            measurement, station_index
+        )))
     }
 }
