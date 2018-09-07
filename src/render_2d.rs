@@ -1,14 +1,5 @@
 use error::LapstrakeError;
 use scad_dots::core::MinMaxCoord;
-/// Example:
-///
-/// ```
-/// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
-///     .style(PathStyle2::LineWithDots)
-///     .stroke(SvgColor::Blue, 2.);
-/// path.save("tests/tmp/bluepath.svg").unwrap();
-/// ```
-///
 use scad_dots::utils::{Axis, P2, V2};
 
 use svg::node::element::path::Data;
@@ -19,8 +10,9 @@ use svg::{self, node, Document, Node};
 /// The PPI is not entirely standardized between svg rendering programs.
 /// Inkscape currently use 96, but Inkscape version 0.91 and before used 90. In
 /// Illustrator, it's adjustable. If the svg program assumes a different PPI
-/// than what is used here, the scale will be wrong. TODO add scale bar.
-const PIXELS_PER_INCH: f32 = 96.; // pixels per inch
+/// than what is used here, the scale will be wrong. Scale bars are a good
+/// safety feature.
+const PIXELS_PER_INCH: f32 = 96.;
 
 pub struct SvgDoc {
     contents: SvgGroup,
@@ -33,6 +25,19 @@ pub struct SvgGroup {
     translation: Option<V2>,
 }
 
+/// Example:
+///
+/// ```
+/// extern crate lapstrake;
+/// extern crate scad_dots;
+/// use scad_dots::utils::P2;
+/// use lapstrake::render_2d::{SvgPath, PathStyle2, SvgColor};
+/// let path = SvgPath::new(vec![P2::new(0., 0.), P2::new(50., 50.), P2::new(100., 20.)])
+///     .style(PathStyle2::LineWithDots)
+///     .stroke(SvgColor::Blue, 2.);
+/// let scale = 1./12.;
+/// path.save("tests/tmp/bluepath.svg", scale).unwrap();
+/// ```
 #[derive(Clone, Debug)]
 pub struct SvgPath {
     points: Vec<P2>,

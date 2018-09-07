@@ -1,5 +1,3 @@
-// #![feature(slice_patterns)]
-
 extern crate csv;
 extern crate nalgebra;
 #[macro_use]
@@ -17,18 +15,18 @@ mod error;
 mod hull;
 mod load;
 mod plank;
-mod render_3d;
+pub mod render_2d;
+pub mod render_3d;
 mod spec;
 mod spline;
 mod unit;
 mod util;
 
+pub use draw::*;
+pub use error::LapstrakeError;
+pub use hull::*;
 pub use load::load_spec;
 pub use render_3d::view_3d;
-pub mod render_2d;
-pub use draw::*;
-use error::LapstrakeError;
-pub use hull::*;
 pub use spec::*;
 
 use std::process;

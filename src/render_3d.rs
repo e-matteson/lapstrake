@@ -3,22 +3,24 @@ use scad_dots::errors::ScadDotsError;
 use scad_dots::harness::preview_model;
 use scad_dots::utils::{P3, R3};
 
-// use error::LapstrakeError;
+pub const SCAD_STROKE: f32 = 0.1;
 
 /// Example:
 ///
 /// ```
+/// extern crate lapstrake;
+/// extern crate scad_dots;
+/// use lapstrake::render_3d::{view_3d, PathStyle3, ScadPath};
+/// use scad_dots::utils::P3;
+///
 /// let path = ScadPath::new(vec![
 ///     P3::new(0., 0., 0.),
-///     P3::new(50., 50., 0.),
-///     P3::new(100., 20., 75.),
-/// ]).show_points();
-///
-/// preview_model(&path.link(PathStyle3::Line)?)?;
+///     P3::new(5., 5., 0.),
+///     P3::new(10., 2., 7.5),
+/// ]).show_points()
+/// .link(PathStyle3::Line)
+/// .unwrap();
 /// ```
-
-pub const SCAD_STROKE: f32 = 0.1;
-
 pub struct ScadPath {
     points: Vec<P3>,
     show_points: bool,
@@ -33,7 +35,7 @@ pub enum PathStyle3 {
 }
 
 pub fn view_3d(renderings: Vec<Tree>) -> Result<(), ScadDotsError> {
-    Ok(preview_model(&Tree::union(renderings))?)
+    preview_model(&Tree::union(renderings))
 }
 
 impl ScadPath {
