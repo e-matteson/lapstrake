@@ -1,4 +1,3 @@
-use failure::Error;
 use scad_dots::utils::{distance, Axis, P2, P3};
 
 // How near points must be to be considered equal, in feet.
@@ -40,8 +39,7 @@ pub fn reflect2(axis: Axis, points: &[P2]) -> Vec<P2> {
             let mut new = *p;
             new[axis.index()] *= -1.;
             new
-        })
-        .collect()
+        }).collect()
 }
 
 pub fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
@@ -51,16 +49,15 @@ pub fn reflect3(axis: Axis, points: &[P3]) -> Vec<P3> {
             let mut new = *p;
             new[axis.index()] *= -1.;
             new
-        })
-        .collect()
+        }).collect()
 }
 
-pub fn print_error(error: Error) {
-    let mut causes = error.causes();
-    if let Some(first) = causes.next() {
-        println!("\nError: {}", first);
-    }
-    for cause in causes {
-        println!("Cause: {}", cause);
-    }
-}
+// pub fn print_error(error: Error) {
+//     let mut causes = error.causes();
+//     if let Some(first) = causes.next() {
+//         println!("\nError: {}", first);
+//     }
+//     for cause in causes {
+//         println!("Cause: {}", cause);
+//     }
+// }

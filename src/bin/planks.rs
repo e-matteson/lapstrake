@@ -1,8 +1,8 @@
 extern crate lapstrake;
 
-use std::path::Path;
-use lapstrake::{load_spec, try};
 use lapstrake::render_2d::SvgDoc;
+use lapstrake::{load_spec, try};
+use std::path::Path;
 
 fn main() {
     try(|| {
@@ -13,9 +13,9 @@ fn main() {
         // Render the flattened planks to an svg.
         let mut doc = SvgDoc::new();
         for plank in &hull.get_flattened_planks()? {
-            doc.append_path(plank.render_2d());
+            doc.append(plank.render_2d());
         }
-        doc.save("images/plank.svg")?;
+        doc.save("images/plank.svg", 1.)?;
         Ok(())
     })
 }

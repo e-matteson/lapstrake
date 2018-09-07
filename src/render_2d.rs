@@ -1,3 +1,5 @@
+use error::LapstrakeError;
+use scad_dots::core::MinMaxCoord;
 /// Example:
 ///
 /// ```
@@ -7,16 +9,12 @@
 /// path.save("tests/tmp/bluepath.svg").unwrap();
 /// ```
 ///
-
 use scad_dots::utils::{Axis, P2, V2};
-use scad_dots::core::MinMaxCoord;
 
-use failure::Error;
-
-use svg::{self, node, Document, Node};
-use svg::node::Value;
-use svg::node::element::{Circle, Group, Path, Rectangle, Text};
 use svg::node::element::path::Data;
+use svg::node::element::{Circle, Group, Path, Rectangle, Text};
+use svg::node::Value;
+use svg::{self, node, Document, Node};
 
 /// The PPI is not entirely standardized between svg rendering programs.
 /// Inkscape currently use 96, but Inkscape version 0.91 and before used 90. In
@@ -157,7 +155,7 @@ impl SvgDoc {
         self,
         filename: &str,
         scale_from_feet: f32,
-    ) -> Result<(), Error> {
+    ) -> Result<(), LapstrakeError> {
         println!("Saving svg file {}.", filename);
         Ok(svg::save(filename, &self.finalize(scale_from_feet))?)
     }
@@ -196,7 +194,7 @@ impl SvgGroup {
     pub fn new_grid(
         contents: Vec<SvgGroup>,
         spacing: f32,
-    ) -> Result<SvgGroup, Error> {
+    ) -> Result<SvgGroup, LapstrakeError> {
         let num_rows = (contents.len() as f32).sqrt() as usize;
         SvgGroup::grid_helper(contents, spacing, num_rows)
     }
@@ -204,7 +202,7 @@ impl SvgGroup {
     pub fn new_vertical(
         contents: Vec<SvgGroup>,
         spacing: f32,
-    ) -> Result<SvgGroup, Error> {
+    ) -> Result<SvgGroup, LapstrakeError> {
         let num_rows = contents.len();
         SvgGroup::grid_helper(contents, spacing, num_rows)
     }
@@ -212,7 +210,7 @@ impl SvgGroup {
     pub fn new_horizontal(
         contents: Vec<SvgGroup>,
         spacing: f32,
-    ) -> Result<SvgGroup, Error> {
+    ) -> Result<SvgGroup, LapstrakeError> {
         SvgGroup::grid_helper(contents, spacing, 1)
     }
 
@@ -220,7 +218,7 @@ impl SvgGroup {
         contents: Vec<SvgGroup>,
         spacing: f32,
         num_rows: usize,
-    ) -> Result<SvgGroup, Error> {
+    ) -> Result<SvgGroup, LapstrakeError> {
         let mut group = SvgGroup::new();
         let mut column_bound = Bound::new();
         let y_spacing = V2::new(0., spacing);
@@ -254,9 +252,9 @@ impl SvgGroup {
         self.contents.push(Box::new(thing));
     }
 
-    pub fn translate_to(&mut self, new_low: P2) -> Result<(), Error> {
+    pub fn translate_to(&mut self, new_low: P2) -> Result<(), LapstrakeError> {
         let bound = self.bound().ok_or_else(|| {
-            format_err!(
+            LapstrakeError::Draw.context(
                 "Cannot translate group to a position because current bound is not known"
             )
         })?;
@@ -355,7 +353,7 @@ impl SvgPath {
         self,
         filename: &str,
         scale_from_feet: f32,
-    ) -> Result<(), Error> {
+    ) -> Result<(), LapstrakeError> {
         let mut doc = SvgDoc::new();
         doc.append(self);
         doc.save(filename, scale_from_feet)?;
@@ -745,7 +743,8 @@ impl Bound {
     }
 
     pub fn contains(&self, other: &Bound) -> bool {
-        self.low.x <= other.low.x && self.low.y <= other.low.y
+        self.low.x <= other.low.x
+            && self.low.y <= other.low.y
             && self.high.x >= other.high.x
             && self.high.y >= other.high.y
     }
@@ -801,7 +800,7 @@ fn scale(scale_from_feet: f32) -> f32 {
     scale_from_feet * 12. * PIXELS_PER_INCH
 }
 
-pub fn make_scale_bar() -> Result<SvgGroup, Error> {
+pub fn make_scale_bar() -> Result<SvgGroup, LapstrakeError> {
     let stroke = 0.05;
     let short_length = 1.;
     let long_length = 10.;

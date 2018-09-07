@@ -2,7 +2,8 @@
 
 use std::fmt;
 use std::str::FromStr;
-use failure::{Error, ResultExt};
+
+use error::{LapstrakeError, ResultExt};
 
 /// Feet, inches, and eighths of an inch.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -22,48 +23,23 @@ impl Feet {
     }
 
     /// Parse Feet from a string, using the format 2-3-4.
-    pub fn parse(text: &str) -> Result<Feet, Error> {
+    pub fn parse(text: &str) -> Result<Feet, LapstrakeError> {
         match Feet::parse_opt(text)? {
-            None => bail!(
-                concat!(
-                    "Was unable to read measurement '{}'. ",
-                    "(This measurement cannot be ommited.)"
-                ),
-                text
-            ),
+            None => Err(LapstrakeError::Load
+                .context("this required measurement was omitted")),
             Some(feet) => Ok(feet),
         }
     }
 
     /// Parse Option<Feet> from a string, using the format 2-3-4, or
     /// "x" for None.
-    pub fn parse_opt(text: &str) -> Result<Option<Feet>, Error> {
-        fn parse_usize(text: &str) -> Result<u32, Error> {
-            match u32::from_str(text) {
-                Ok(n) => Ok(n),
-                Err(_) => bail!(
-                    "Was not able to read number in measurement '{}'.",
-                    text
-                ),
-            }
-        }
-
+    pub fn parse_opt(text: &str) -> Result<Option<Feet>, LapstrakeError> {
         if text == "x" {
             return Ok(None);
         }
 
-        let parts: Vec<&str> = text.split('-').collect();
-        let message = concat!(
-            "Was not able to read measurement. ",
-            "Expected formatting like 3-4-5 for 3' 4 5/8\"."
-        );
-        match parts.as_slice() {
-            &[feet, inches, eighths] => Ok(Some(Feet {
-                feet: parse_usize(&feet).context(message)?,
-                inches: parse_usize(&inches).context(message)?,
-                eighths: parse_usize(&eighths).context(message)?,
-            })),
-            _ => bail!(
+        let feet = Self::from_text(text).with_context(|| {
+            format!(
                 concat!(
                     "Was not able to read measurement '{}'. ",
                     "Expected formatting like 3-4-5 for 3' 4 5/8\". ",
@@ -71,14 +47,41 @@ impl Feet {
                     "even if they are zero."
                 ),
                 text
-            ),
+            )
+        })?;
+
+        Ok(Some(feet))
+    }
+
+    fn from_text(text: &str) -> Result<Self, LapstrakeError> {
+        let parts: Vec<&str> = text.split('-').collect();
+
+        match parts.as_slice() {
+            &[feet_str, inches_str, eighths_str] => Ok(Feet {
+                feet: Self::parse_usize(feet_str).context("Invalid feet.")?,
+                inches: Self::parse_usize(inches_str)
+                    .context("Invalid inches.")?,
+                eighths: Self::parse_usize(eighths_str)
+                    .context("Invalid eighths.")?,
+            }),
+            _ => Err(LapstrakeError::Load
+                .context("Didn't find exactly 3 parts in the measurement.")),
         }
+    }
+
+    fn parse_usize(text: &str) -> Result<u32, LapstrakeError> {
+        u32::from_str(text).map_err(|_| {
+            LapstrakeError::Load.with_context(|| {
+                format!("Unable to read number in measurement: '{}'.", text)
+            })
+        })
     }
 }
 
 impl Into<f32> for Feet {
     fn into(self) -> f32 {
-        (self.feet as f32) + (self.inches as f32 / 12.)
+        (self.feet as f32)
+            + (self.inches as f32 / 12.)
             + (self.eighths as f32 / 12. / 8.)
     }
 }

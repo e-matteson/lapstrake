@@ -1,34 +1,34 @@
 //! Read in ship data from csv files.
 
+use std::fs;
+use std::io;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::iter;
-use std::io;
-use std::fs;
 
 use csv;
-use failure::{Error, ResultExt};
 
-use unit::*;
+use error::{LapstrakeError, ResultExt};
 use spec::*;
+use unit::*;
 
 /// Read the three spec files from a given directory.
 /// data.csv contains reference points along cross sections of the hull.
 /// planks.csv says where planks should be placed on the hull.
 /// config.csv has various configuration options.
-pub fn load_spec(path: &Path) -> Result<Spec, Error> {
+pub fn load_spec(path: &Path) -> Result<Spec, LapstrakeError> {
     // Read data.csv
     let data_path = &extend_path(path, "data.csv");
     let data = read_data_from_csv(open_csv_file(data_path)?)
-        .context(format!("Could not parse file {:?}.", data_path))?;
+        .with_context(|| format!("Could not parse file {:?}.", data_path))?;
     // Read planks.csv
     let planks_path = &extend_path(path, "planks.csv");
     let planks = read_planks_from_csv(open_csv_file(planks_path)?)
-        .context(format!("Could not parse file {:?}.", planks_path))?;
+        .with_context(|| format!("Could not parse file {:?}.", planks_path))?;
     // Read config.csv
     let config_path = &extend_path(path, "config.csv");
     let config = read_config_from_csv(open_csv_file(config_path)?)
-        .context(format!("Could not parse file {:?}.", config_path))?;
+        .with_context(|| format!("Could not parse file {:?}.", config_path))?;
     Ok(Spec {
         data: data,
         planks: planks,
@@ -43,13 +43,16 @@ enum Section {
     Breadths,
 }
 
-fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, Error> {
+fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, LapstrakeError> {
     println!("Loading file {:?}.", path);
-    Ok(csv::Reader::from_path(&path)
-        .context(format!("Could not read file {:?}.", path))?)
+    csv::Reader::from_path(&path)
+        .map_err(|csv_err| LapstrakeError::from(csv_err))
+        .with_context(|| format!("Could not read csv file {:?}.", path))
 }
 
-fn read_planks_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Planks, Error>
+fn read_planks_from_csv<T>(
+    mut csv: csv::Reader<T>,
+) -> Result<Planks, LapstrakeError>
 where
     T: io::Read,
 {
@@ -79,17 +82,23 @@ where
     })
 }
 
-fn read_config_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Config, Error>
+fn read_config_from_csv<T>(
+    mut csv: csv::Reader<T>,
+) -> Result<Config, LapstrakeError>
 where
     T: io::Read,
 {
     match csv.deserialize().next() {
-        None => bail!("Found no rows in config file."),
+        None => {
+            Err(LapstrakeError::Load.context("Found no rows in config file."))
+        }
         Some(row) => Ok(row?),
     }
 }
 
-fn read_data_from_csv<T>(mut csv: csv::Reader<T>) -> Result<Data, Error>
+fn read_data_from_csv<T>(
+    mut csv: csv::Reader<T>,
+) -> Result<Data, LapstrakeError>
 where
     T: io::Read,
 {
@@ -121,10 +130,9 @@ where
                     Section::Heights => read_section(&mut recs, &mut heights),
                     Section::Breadths => read_section(&mut recs, &mut breadths),
                 }
-            }.context(format!(
-                "Could not parse section {:?}.",
-                section
-            ))?,
+            }.with_context(|| {
+                format!("Could not parse section {:?}.", section)
+            })?,
         };
     }
 
@@ -150,10 +158,10 @@ where
 fn read_section<CSV, T>(
     csv: &mut iter::Peekable<CSV>,
     table: &mut Vec<DataRow<T>>,
-) -> Result<(), Error>
+) -> Result<(), LapstrakeError>
 where
     CSV: Iterator<Item = csv::Result<csv::StringRecord>>,
-    T: FromStr<Err = Error>,
+    T: FromStr<Err = LapstrakeError>,
 {
     loop {
         if !is_data_row(csv) {
@@ -176,7 +184,9 @@ where
     Ok(())
 }
 
-fn read_section_name<CSV>(csv: &mut CSV) -> Result<Option<Section>, Error>
+fn read_section_name<CSV>(
+    csv: &mut CSV,
+) -> Result<Option<Section>, LapstrakeError>
 where
     CSV: Iterator<Item = csv::Result<csv::StringRecord>>,
 {
@@ -189,37 +199,45 @@ where
                     "fore-aft position" => Ok(Some(Section::Positions)),
                     "height" => Ok(Some(Section::Heights)),
                     "breadth" => Ok(Some(Section::Breadths)),
-                    _ => bail!(
-                        concat!(
-                            "Did not recognize the name {}. ",
-                            "Expected one of these section names: ",
-                            "Height, Breadth, Fore-Aft Position."
-                        ),
-                        name
-                    ),
+                    _ => Err(LapstrakeError::Load).with_context(|| {
+                        format!(
+                            concat!(
+                                "Did not recognize the name {}. ",
+                                "Expected one of these section names: ",
+                                "Height, Breadth, Fore-Aft Position."
+                            ),
+                            name,
+                        )
+                    }),
                 },
-                None => bail!("Expected section name, found blank line."),
+                None => Err(LapstrakeError::Load)
+                    .context("Expected section name, found blank line."),
             }
         }
         None => Ok(None),
     }
 }
 
-fn read_plank_curve_fraction(text: &str) -> Result<Option<f32>, Error> {
+fn read_plank_curve_fraction(
+    text: &str,
+) -> Result<Option<f32>, LapstrakeError> {
     if text == "x" {
         Ok(None)
     } else {
-        let frac = f32::from_str(text)?;
+        let frac = f32::from_str(text)
+            .map_err(|e| LapstrakeError::Load.with_context(|| e.to_string()))?;
         if frac >= 0.0 && frac <= 1.0 {
             Ok(Some(frac))
         } else {
-            bail!(
-                concat!(
-                    "Plank location fractions must be between 0 ",
-                    "and 1. Read fraction {}."
-                ),
-                frac
-            )
+            Err(LapstrakeError::Load.with_context(|| {
+                format!(
+                    concat!(
+                        "Plank location fractions must be between 0 ",
+                        "and 1. Read fraction {}."
+                    ),
+                    frac
+                )
+            }))
         }
     }
 }
@@ -238,8 +256,8 @@ fn extend_path(path: &Path, ext: &str) -> PathBuf {
 }
 
 impl FromStr for BreadthLine {
-    type Err = Error;
-    fn from_str(text: &str) -> Result<BreadthLine, Error> {
+    type Err = LapstrakeError;
+    fn from_str(text: &str) -> Result<BreadthLine, LapstrakeError> {
         match text.to_lowercase().as_str() {
             "sheer" => Ok(BreadthLine::Sheer),
             "wale" => Ok(BreadthLine::Wale),
@@ -253,8 +271,8 @@ impl FromStr for BreadthLine {
 }
 
 impl FromStr for HeightLine {
-    type Err = Error;
-    fn from_str(text: &str) -> Result<HeightLine, Error> {
+    type Err = LapstrakeError;
+    fn from_str(text: &str) -> Result<HeightLine, LapstrakeError> {
         match text.to_lowercase().as_str() {
             "sheer" => Ok(HeightLine::Sheer),
             text => {

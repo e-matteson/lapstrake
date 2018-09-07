@@ -1,14 +1,14 @@
-use std::iter;
 use nalgebra::{normalize, Rotation2};
-use scad_dots::utils::{Axis, P2, P3, V2};
 use scad_dots::core::{MinMaxCoord, Tree};
-use failure::Error;
+use scad_dots::utils::{Axis, P2, P3, V2};
+use std::iter;
 
-use util::{EQUALITY_THRESHOLD, practically_zero};
-use spline::Spline;
-use scad_dots::utils::distance;
-use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
+use error::LapstrakeError;
 use render_2d::{PathStyle2, SvgColor, SvgPath};
+use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
+use scad_dots::utils::distance;
+use spline::Spline;
+use util::{practically_zero, EQUALITY_THRESHOLD};
 
 /// A plank on the hull.
 /// This is a 3d object located at its position on the ship.
@@ -64,9 +64,9 @@ impl FlattenedPlank {
     }
 
     // Flatten planks to 2d. Place them nicely, without overlap.
-    pub(crate) fn flatten_planks(planks: Vec<Plank>)
-                                 -> Result<Vec<FlattenedPlank>, Error>
-    {
+    pub(crate) fn flatten_planks(
+        planks: Vec<Plank>,
+    ) -> Result<Vec<FlattenedPlank>, LapstrakeError> {
         let mut layed_planks = vec![];
         let mut last_y = None;
         for mut plank in planks {
@@ -88,7 +88,7 @@ impl Plank {
         bot_line: Vec<P3>,
         top_line: Vec<P3>,
         resolution: usize,
-    ) -> Result<Plank, Error> {
+    ) -> Result<Plank, LapstrakeError> {
         Ok(Plank {
             resolution: ((bot_line.len() + top_line.len()) / 2) * resolution,
             bottom_line: Spline::new(bot_line, resolution)?,
@@ -97,7 +97,7 @@ impl Plank {
     }
 
     /// A plank is a 3d object. Flatten it onto a plane.
-    pub fn flatten(&self) -> Result<FlattenedPlank, Error> {
+    pub fn flatten(&self) -> Result<FlattenedPlank, LapstrakeError> {
         let (first_len, triangles) = self.triangles()?;
         let mut top_line = vec![];
         let mut bottom_line = vec![];
@@ -122,20 +122,17 @@ impl Plank {
     }
 
     // Give the leftmost edge length, then triangle lengths from left to right.
-    fn triangles(&self) -> Result<(f32, Vec<Triangles>), Error> {
-        let top_pts = self.top_line.sample(Some(self.resolution));
-        let bot_pts = self.bottom_line.sample(Some(self.resolution));
+    fn triangles(&self) -> Result<(f32, Vec<Triangles>), LapstrakeError> {
+        let top_pts = self.top_line.sample(Some(self.resolution))?;
+        let bot_pts = self.bottom_line.sample(Some(self.resolution))?;
         let left_len = distance(&top_pts[0], &bot_pts[0]);
         let mut triangles = vec![];
         if top_pts.len() != bot_pts.len() {
-            panic!(
-                concat!(
-                    "Plank unexpectedly has different number ",
-                    "of top and bottom points. {} {}"
-                ),
+            return Err(LapstrakeError::General(format!(
+                    "Plank unexpectedly has different number of top and bottom points. {} {}",
                 top_pts.len(),
                 bot_pts.len()
-            );
+                )));
         }
         let n = top_pts.len();
         for i in 0..n - 1 {
@@ -150,12 +147,11 @@ impl Plank {
     }
 
     /// Render in 3d.
-    pub fn render_3d(&self) -> Result<Tree, Error> {
+    pub fn render_3d(&self) -> Result<Tree, LapstrakeError> {
         // Get the lines (bottom includes edges)
-        let top_line = self.top_line.sample(None);
-        let bottom_line =
-            iter::once(top_line[0])
-            .chain(self.bottom_line.sample(None).into_iter())
+        let top_line = self.top_line.sample(None)?;
+        let bottom_line = iter::once(top_line[0])
+            .chain(self.bottom_line.sample(None)?.into_iter())
             .chain(iter::once(*top_line.last().unwrap()))
             .collect();
         // render the lines (top is dotted)
@@ -166,7 +162,7 @@ impl Plank {
             .stroke(SCAD_STROKE)
             .link(PathStyle3::Line)?;
         // return the rendering
-        Ok(Tree::Union(vec![dots, solid]))
+        Ok(Tree::union(vec![dots, solid]))
     }
 }
 

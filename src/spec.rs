@@ -1,9 +1,9 @@
-//! Specs for the ship hull.
+//! Specifications for the ship hull.
 
-use std::fmt;
 use std::cmp;
-use failure::Error;
+use std::fmt;
 
+use error::LapstrakeError;
 use unit::*;
 
 /// The spec for the hull of a ship, plus configuration options.
@@ -82,17 +82,23 @@ impl Spec {
         &self,
         station: usize,
         line: HeightLine,
-    ) -> Result<Feet, Error> {
+    ) -> Result<Feet, LapstrakeError> {
         Spec::lookup(&self.data.positions, station, line)
     }
 
     /// Get the breadth of the sheer at the nth station.
-    pub fn get_sheer_breadth(&self, station: usize) -> Result<Feet, Error> {
+    pub fn get_sheer_breadth(
+        &self,
+        station: usize,
+    ) -> Result<Feet, LapstrakeError> {
         Spec::lookup(&self.data.breadths, station, HeightLine::Sheer)
     }
 
     /// Get the height of the sheer at the nth station.
-    pub fn get_sheer_height(&self, station: usize) -> Result<Feet, Error> {
+    pub fn get_sheer_height(
+        &self,
+        station: usize,
+    ) -> Result<Feet, LapstrakeError> {
         Spec::lookup(&self.data.heights, station, BreadthLine::Sheer)
     }
 
@@ -100,7 +106,7 @@ impl Spec {
         rows: &Vec<DataRow<M>>,
         station_index: usize,
         measurement: M,
-    ) -> Result<Feet, Error>
+    ) -> Result<Feet, LapstrakeError>
     where
         M: fmt::Debug + cmp::Eq + Copy,
     {
@@ -112,10 +118,11 @@ impl Spec {
                 }
             }
         }
-        bail!(
-            "Could not find a measurement for {:?} at station index {}",
-            measurement,
-            station_index
-        );
+        Err(LapstrakeError::Load.with_context(|| {
+            format!(
+                "Could not find a measurement for {:?} at station index {}",
+                measurement, station_index
+            )
+        }))
     }
 }

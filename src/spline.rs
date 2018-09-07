@@ -2,12 +2,12 @@
 //!
 //! Implemented with the centripetal Catmull-Rom algorithm.
 
-use util::{practically_zero, remove_duplicates};
 use scad_dots::utils::{Axis, P3};
-use failure::Error;
+use util::{practically_zero, remove_duplicates};
 
 use catmullrom::CentripetalCatmullRom;
 use catmullrom::Segment::{First, Last, Middle};
+use error::LapstrakeError;
 use util::project;
 
 /// A spline with any number of points.
@@ -20,11 +20,12 @@ impl Spline {
     pub fn new(
         ref_points: Vec<P3>,
         resolution: usize,
-    ) -> Result<Spline, Error> {
+    ) -> Result<Spline, LapstrakeError> {
         let ref_points = remove_duplicates(ref_points);
         let n = ref_points.len();
         if n < 4 {
-            bail!("Splines must have at least 4 points.")
+            return Err(LapstrakeError::Spline
+                .context("Splines must have at least 4 points"));
         }
         let mut points: Vec<P3> = vec![];
         for i in 0..n - 3 {
@@ -47,18 +48,21 @@ impl Spline {
 
     /// A sample of points along the spline, at the resolution given
     /// at construction.
-    pub fn sample(&self, resolution: Option<usize>) -> Vec<P3> {
-        match resolution {
+    pub fn sample(
+        &self,
+        resolution: Option<usize>,
+    ) -> Result<Vec<P3>, LapstrakeError> {
+        Ok(match resolution {
             None => self.points.clone(),
             Some(resolution) => {
                 let mut points = vec![];
                 for i in 0..resolution + 1 {
                     let t = i as f32 / resolution as f32;
-                    points.push(self.at_t(t));
+                    points.push(self.at_t(t)?);
                 }
                 points
             }
-        }
+        })
     }
 
     /// The total length of the spline.
@@ -74,7 +78,7 @@ impl Spline {
 
     /// Get the point at a given distance along the curve from the
     /// start of the spline.
-    pub fn at_len(&self, desired_length: f32) -> P3 {
+    pub fn at_len(&self, desired_length: f32) -> Result<P3, LapstrakeError> {
         let mut length = 0.0;
         let mut prev_point = self.points[0];
         for &point in &self.points[1..] {
@@ -83,27 +87,28 @@ impl Spline {
                 // We are between prev_point and point. Linearly interpolate.
                 // The projection throws this off a bit, but it shouldn't matter.
                 if practically_zero(delta) {
-                    return prev_point;
+                    return Ok(prev_point);
                 } else {
                     let t = (desired_length - length) / delta;
-                    return linear_interpolate(t, prev_point, point);
+                    return Ok(linear_interpolate(t, prev_point, point));
                 }
             } else {
                 length += delta;
                 prev_point = point;
             }
         }
-        panic!("Fell off the end of a spline.");
+        // We shouldn't ever get here.
+        Err(LapstrakeError::Spline.context("Fell off the end of a spline!"))
     }
 
     /// Get the point at a given fraction along the curve.
-    pub fn at_t(&self, t: f32) -> P3 {
+    pub fn at_t(&self, t: f32) -> Result<P3, LapstrakeError> {
         let len = self.length();
         self.at_len(t * len)
     }
 
     /// Get the point at a given x coordinate (a.k.a. position).
-    pub fn at_x(&self, desired_x: f32) -> Result<P3, Error> {
+    pub fn at_x(&self, desired_x: f32) -> Result<P3, LapstrakeError> {
         let result = self.points.binary_search_by(|pt| {
             pt.x.partial_cmp(&desired_x).expect("Not a number!")
         });
@@ -111,7 +116,8 @@ impl Spline {
             Ok(i) => i,
             Err(i) => i,
         };
-        Ok(*self.points
+        Ok(*self
+            .points
             .get(i)
             .expect(&format!("Could not get point at position {}", desired_x)))
     }

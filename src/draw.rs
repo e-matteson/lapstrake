@@ -1,23 +1,23 @@
-use scad_dots::utils::{Axis, P2, P3, V2};
 use scad_dots::core::{MinMaxCoord, Tree};
-use failure::Error;
+use scad_dots::utils::{Axis, P2, P3, V2};
 
-use util::{reflect2, reflect3, project_points};
-use unit::Feet;
-use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
-use render_2d::{Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
-                SvgGroup, SvgPath, SvgText, make_scale_bar};
+use error::LapstrakeError;
 use hull::{Hull, Station};
-
-
+use render_2d::{
+    make_scale_bar, Bound, Bounded, PathStyle2, SvgCircle, SvgColor, SvgDoc,
+    SvgGroup, SvgPath, SvgText,
+};
+use render_3d::{PathStyle3, ScadPath, SCAD_STROKE};
+use unit::Feet;
+use util::{project_points, reflect2, reflect3};
 
 impl Hull {
-    pub fn draw_half_breadths(&self) -> Vec<SvgPath> {
+    pub fn draw_half_breadths(&self) -> Result<Vec<SvgPath>, LapstrakeError> {
         let stroke = 0.02;
         let mut paths = self.draw_height_breadth_grid(stroke);
         let half = (self.stations.len() as f32) / 2.;
         for (i, station) in self.stations.iter().enumerate() {
-            let mut samples: Vec<P3> = station.spline.sample(None);
+            let mut samples: Vec<P3> = station.spline.sample(None)?;
             let mut points: Vec<P3> = station.points.clone();
             if (i as f32) >= half {
                 samples = reflect3(Axis::Y, &samples);
@@ -34,13 +34,14 @@ impl Hull {
                     .style(PathStyle2::Dots),
             );
         }
-        paths
+        Ok(paths)
     }
 
+    // TODO split up long function
     pub fn draw_cross_sections(
         &self,
         excluded: &[String],
-    ) -> Result<SvgDoc, Error> {
+    ) -> Result<SvgDoc, LapstrakeError> {
         const HOLE_DIAMETER: f32 = 0.125;
         const STROKE: f32 = 0.02;
         let mut paths = Vec::new();
@@ -50,18 +51,18 @@ impl Hull {
                 continue;
             }
             let path = station
-                .get_cross_section_path()
+                .get_cross_section_path()?
                 .stroke(SvgColor::Black, 0.02);
             bounds.push(path.bound());
             paths.push((station.name.clone(), path));
         }
 
         let max_y = Bound::union_all(&bounds).high.y;
-        let intersection = Bound::intersect_all(&bounds).ok_or_else(|| {
-            format_err!(
-                "cross-sections have no overlap in which to place alignment holes"
-            )
-        })?;
+
+        let intersection = Bound::intersect_all(&bounds)
+            .ok_or(LapstrakeError::Draw.context(
+            "cross-sections have no overlap in which to place alignment holes",
+        ))?;
 
         let hole_positions = vec![
             intersection.relative_pos(0.5, 0.33),
@@ -73,7 +74,9 @@ impl Hull {
             let hole = SvgCircle::new(pos, HOLE_DIAMETER / 2.)
                 .stroke(SvgColor::Black, STROKE);
             if !intersection.contains(&hole.bound().unwrap()) {
-                bail!("hole doesn't fit in overlap between cross-sections");
+                return Err(LapstrakeError::Draw.context(
+                    "hole doesn't fit in overlap between cross-sections",
+                ));
             }
             holes.append(hole)
         }
@@ -114,6 +117,8 @@ impl Hull {
     }
 
     pub fn draw_height_breadth_grid(&self, stroke: f32) -> Vec<SvgPath> {
+        // TODO don't draw extra height lines
+        // TODO generalize for different views
         let color = SvgColor::DarkGrey;
         let style = PathStyle2::Line;
 
@@ -144,49 +149,52 @@ impl Hull {
         lines
     }
 
-
     /// Construct a station at the given for-aft position, then render it.
-    pub fn render_station_at(&self, posn: Feet) -> Result<Tree, Error> {
+    pub fn render_station_at(
+        &self,
+        posn: Feet,
+    ) -> Result<Tree, LapstrakeError> {
         let station = self.hallucinate_station(posn)?;
-        Ok(ScadPath::new(station.points.clone())
+        let path = ScadPath::new(station.points.clone())
             .stroke(0.1)
             .show_points()
-            .link(PathStyle3::Line)?)
+            .link(PathStyle3::Line)?;
+        Ok(path)
     }
 
     /// Render all of this hull's stations.
-    pub fn render_stations(&self) -> Result<Tree, Error> {
+    pub fn render_stations(&self) -> Result<Tree, LapstrakeError> {
         let mut trees = Vec::new();
         for station in &self.stations {
-            trees.push(ScadPath::new(station.points.clone())
-                .stroke(0.1)
-                .show_points()
-                .link(PathStyle3::Line)?)
+            trees.push(
+                ScadPath::new(station.points.clone())
+                    .stroke(0.1)
+                    .show_points()
+                    .link(PathStyle3::Line)?,
+            )
         }
-        Ok(Tree::Union(trees))
+        Ok(Tree::union(trees))
     }
 }
 
 impl Station {
-
-    fn get_cross_section_path(&self) -> SvgPath {
+    fn get_cross_section_path(&self) -> Result<SvgPath, LapstrakeError> {
         // Draw right and left halves of cross-section
         let mut points: Vec<_> =
-            self.spline.sample(None).into_iter().rev().collect();
+            self.spline.sample(None)?.into_iter().rev().collect();
         let left = reflect3(Axis::Y, &points);
         points.extend(left.iter().rev());
-        SvgPath::new(project_points(Axis::X, &points))
+        Ok(SvgPath::new(project_points(Axis::X, &points))
             .stroke(SvgColor::Black, 0.02)
             .style(PathStyle2::Line)
-            .close()
+            .close())
     }
 
-    pub fn render_3d(&self) -> Result<Tree, Error> {
+    pub fn render_3d(&self) -> Result<Tree, LapstrakeError> {
         let path = ScadPath::new(self.points.clone())
             .stroke(SCAD_STROKE)
             .show_points()
-            .link(PathStyle3::Line);
-        path
+            .link(PathStyle3::Line)?;
+        Ok(path)
     }
-
 }

@@ -1,8 +1,9 @@
-use failure::Error;
-
-use scad_dots::core::{chain, Dot, DotAlign, DotSpec, Shape, Tree};
-use scad_dots::utils::{P3, R3};
+use scad_dots::core::{chain, Dot, DotAlign, DotShape, DotSpec, Tree};
+use scad_dots::errors::ScadDotsError;
 use scad_dots::harness::preview_model;
+use scad_dots::utils::{P3, R3};
+
+// use error::LapstrakeError;
 
 /// Example:
 ///
@@ -31,8 +32,8 @@ pub enum PathStyle3 {
     Solid,
 }
 
-pub fn view_3d(renderings: Vec<Tree>) -> Result<(), Error> {
-    preview_model(&Tree::Union(renderings))
+pub fn view_3d(renderings: Vec<Tree>) -> Result<(), ScadDotsError> {
+    Ok(preview_model(&Tree::union(renderings))?)
 }
 
 impl ScadPath {
@@ -54,15 +55,15 @@ impl ScadPath {
         self
     }
 
-    pub fn link(self, style: PathStyle3) -> Result<Tree, Error> {
+    pub fn link(self, style: PathStyle3) -> Result<Tree, ScadDotsError> {
         let dots = self.make_dots(self.stroke);
         let mut tree = match style {
-            PathStyle3::Dots => Tree::Union(dots),
-            PathStyle3::Solid => Tree::Hull(dots),
+            PathStyle3::Dots => Tree::union(dots),
+            PathStyle3::Solid => Tree::hull(dots),
             PathStyle3::Line => chain(&dots)?,
         };
         if self.show_points {
-            let markers = Tree::Union(self.make_dots(self.stroke * 2.));
+            let markers = Tree::union(self.make_dots(self.stroke * 2.));
             tree = union![tree, markers];
         }
         Ok(tree)
@@ -73,11 +74,12 @@ impl ScadPath {
         for p in &self.points {
             let spec = DotSpec {
                 pos: p.to_owned(),
-                align: DotAlign::center_solid(),
+                align: DotAlign::centroid(),
                 size: diameter,
                 rot: R3::identity(),
+                shape: DotShape::Sphere,
             };
-            dots.push(dot![Dot::new(Shape::Sphere, spec)]);
+            dots.push(Dot::new(spec).into());
         }
         dots
     }
@@ -87,8 +89,8 @@ impl ScadPath {
 mod tests {
     use super::*;
     use scad_dots::core::mark;
-    use scad_dots::utils::{axis_radians, Corner3 as C3, V3};
     use scad_dots::harness::{check_model, Action};
+    use scad_dots::utils::{axis_radians, Corner3 as C3, V3};
     use std::f32::consts::PI;
 
     #[test]
@@ -100,6 +102,7 @@ mod tests {
                 P3::new(0., 5., -10.),
             ]).show_points();
             path.link(PathStyle3::Solid)
+            // .map_err(|e| ScadDotsError::External(Box::new(e)))
         })
     }
 
@@ -118,16 +121,14 @@ mod tests {
     #[test]
     fn test_dot_sphere() {
         check_model("test_dot_sphere", Action::Test, || {
-            let n = Dot::new(
-                Shape::Sphere,
-                DotSpec {
-                    pos: P3::origin(),
-                    align: C3::P000.into(),
-                    size: 2.0,
-                    rot: axis_radians(V3::x_axis().unwrap(), PI / 4.),
-                },
-            );
-            Ok(dot![n])
+            let n = Dot::new(DotSpec {
+                pos: P3::origin(),
+                align: C3::P000.into(),
+                size: 2.0,
+                rot: axis_radians(V3::x_axis().unwrap(), PI / 4.),
+                shape: DotShape::Sphere,
+            });
+            Ok(Tree::from(n))
         })
     }
 

@@ -1,8 +1,6 @@
-#![feature(slice_patterns)]
+// #![feature(slice_patterns)]
 
 extern crate csv;
-#[macro_use]
-extern crate failure;
 extern crate nalgebra;
 #[macro_use]
 extern crate scad_dots;
@@ -13,34 +11,34 @@ extern crate serde;
 extern crate serde_derive;
 extern crate svg;
 
-mod unit;
-mod spec;
-mod load;
 mod catmullrom;
-mod util;
-mod spline;
-mod plank;
-mod hull;
-mod render_3d;
 mod draw;
+mod error;
+mod hull;
+mod load;
+mod plank;
+mod render_3d;
+mod spec;
+mod spline;
+mod unit;
+mod util;
 
 pub use load::load_spec;
 pub use render_3d::view_3d;
 pub mod render_2d;
-pub use spec::*;
-pub use hull::*;
 pub use draw::*;
+use error::LapstrakeError;
+pub use hull::*;
+pub use spec::*;
 
 use std::process;
-use failure::Error;
-use util::print_error;
 
 pub fn try<F>(run: F)
 where
-    F: Fn() -> Result<(), Error>,
+    F: Fn() -> Result<(), LapstrakeError>,
 {
     if let Err(e) = run() {
-        print_error(e);
+        format!("error: {}", e);
         process::exit(1);
     }
     println!("Done.");
