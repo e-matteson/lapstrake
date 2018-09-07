@@ -1,6 +1,6 @@
 use scad_dots::core::{chain, Dot, DotAlign, DotShape, DotSpec, Tree};
 use scad_dots::errors::ScadDotsError;
-use scad_dots::harness::preview_model;
+pub use scad_dots::harness::preview_model;
 use scad_dots::utils::{P3, R3};
 
 pub const SCAD_STROKE: f32 = 0.1;

@@ -12,7 +12,7 @@ use unit::Feet;
 use util::{project_points, reflect2, reflect3};
 
 impl Hull {
-    pub fn draw_half_breadths(&self) -> Result<Vec<SvgPath>, LapstrakeError> {
+    pub fn draw_half_breadths(&self) -> Result<SvgDoc, LapstrakeError> {
         let stroke = 0.02;
         let mut paths = self.draw_height_breadth_grid(stroke);
         let half = (self.stations.len() as f32) / 2.;
@@ -34,7 +34,9 @@ impl Hull {
                     .style(PathStyle2::Dots),
             );
         }
-        Ok(paths)
+        let mut doc = SvgDoc::new();
+        doc.append_vec(paths);
+        Ok(doc)
     }
 
     // TODO split up long function
@@ -116,6 +118,15 @@ impl Hull {
         Ok(doc)
     }
 
+    /// Flatten the planks and lay them out in an svg document.
+    pub fn draw_planks(&self) -> Result<SvgDoc, LapstrakeError> {
+        let mut doc = SvgDoc::new();
+        for plank in &self.get_flattened_planks()? {
+            doc.append(plank.render_2d());
+        }
+        Ok(doc)
+    }
+
     pub fn draw_height_breadth_grid(&self, stroke: f32) -> Vec<SvgPath> {
         // TODO don't draw extra height lines
         // TODO generalize for different views
@@ -174,6 +185,20 @@ impl Hull {
             )
         }
         Ok(Tree::union(trees))
+    }
+
+    pub fn render_planks(&self) -> Result<Tree, LapstrakeError> {
+        // Get renderings for the planks.
+        let mut plank_renderings = vec![];
+        for plank in &self.get_planks()? {
+            plank_renderings.push(plank.render_3d()?);
+        }
+        Ok(Tree::union(plank_renderings))
+    }
+
+    pub fn render_half_wireframe(&self) -> Result<Tree, LapstrakeError> {
+        // Render the planks & hull stations on one side
+        Ok(union![self.render_planks()?, self.render_stations()?])
     }
 }
 

@@ -5,13 +5,12 @@ authors = ["e-matteson <e.r.matteson@gmail.com>"]
 
 [dependencies]
 
-svg = "*"
-csv = "1.0.0-beta.5"
-nalgebra = "*"
+svg = "^0.5.10"
+csv = "1"
+nalgebra = "0.13"
 serde = "1"
 serde_derive = "1"
+structopt = "0.2"
 
 scad-dots = {git = "https://github.com/e-matteson/scad-dots.git"}
 scad-dots-derive = { git = "https://github.com/e-matteson/scad-dots-derive.git" }
-# scad-dots = { path = "../scad-dots" }
-# scad-dots-derive = { path = "../scad-dots-derive"}

@@ -1,3 +1,5 @@
+use std::path::Path as StdPath;
+
 use error::LapstrakeError;
 use scad_dots::core::MinMaxCoord;
 use scad_dots::utils::{Axis, P2, V2};
@@ -158,10 +160,11 @@ impl SvgDoc {
 
     pub fn save(
         self,
-        filename: &str,
+        // filename: &str,
+        filename: &StdPath,
         scale_from_feet: f32,
     ) -> Result<(), LapstrakeError> {
-        println!("Saving svg file {}.", filename);
+        println!("Saving file: {:?}.", filename);
         Ok(svg::save(filename, &self.finalize(scale_from_feet))?)
     }
 
@@ -356,7 +359,7 @@ impl SvgPath {
 
     pub fn save(
         self,
-        filename: &str,
+        filename: &StdPath,
         scale_from_feet: f32,
     ) -> Result<(), LapstrakeError> {
         let mut doc = SvgDoc::new();

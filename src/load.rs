@@ -1,9 +1,9 @@
 //! Read in ship data from csv files.
 
 use std::fs;
-use std::io;
+// use std::io;
 use std::iter;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 
 use csv;
@@ -32,13 +32,13 @@ impl Spec {
         };
 
         let data = Data::load_from(&path_to("data.csv"))
-            .context("failed to load data sheet")?;
+            .context("Failed to load data sheet")?;
 
         let planks = Planks::load_from(&path_to("planks.csv"))
-            .context("failed to load planks sheet")?;
+            .context("Failed to load planks sheet")?;
 
         let config = Config::load_from(&path_to("config.csv"))
-            .context("failed to load config sheet")?;
+            .context("Failed to load config sheet")?;
 
         Ok(Spec {
             data,
@@ -51,6 +51,7 @@ impl Spec {
 impl Data {
     fn load_from(file: &Path) -> Result<Data, LapstrakeError> {
         let mut csv = open_csv_file(file)?;
+
         // Read stations
         let mut stations = vec![];
         {
@@ -246,10 +247,10 @@ impl Config {
 }
 
 fn open_csv_file(path: &Path) -> Result<csv::Reader<fs::File>, LapstrakeError> {
-    println!("Loading file: '{:?}'.", path);
+    println!("Loading file: {:?}.", path);
     csv::Reader::from_path(&path)
         .map_err(|csv_err| LapstrakeError::from(csv_err))
-        .with_context(|| format!("Could not read csv file: '{:?}'.", path))
+        .with_context(|| format!("Could not read CSV file: {:?}.", path))
 }
 
 impl FromStr for BreadthLine {
